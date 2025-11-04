@@ -1,0 +1,16 @@
+# .tbls.yml
+
+# DSN (Database Source Name) to connect database
+dsn: postgres://moneycontrol:moneycontrol@localhost:5433/moneycontrol?sslmode=disable
+
+# Path to generate document
+# Default is `dbdoc`
+docPath: doc/schema
+
+er:
+  # image format: svg|png|jpg|mermaid (default is svg)
+  format: svg
+  # include table/column comments if present
+  comment: true
+  # hide relation definitions to keep the diagram cleaner
+  hideDef: true

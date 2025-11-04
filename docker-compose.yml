@@ -28,6 +28,16 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+  tbls:
+    image: ghcr.io/k1low/tbls:latest
+    working_dir: /work
+    volumes:
+      - ./:/work
+    environment:
+      TBLS_DSN: postgres://moneycontrol:moneycontrol@postgres:5432/moneycontrol?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   pgdata:
