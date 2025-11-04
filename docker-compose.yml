@@ -1,0 +1,33 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-moneycontrol}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-moneycontrol}
+      POSTGRES_DB: ${DB_NAME:-moneycontrol}
+      TZ: ${TZ:-Europe/Warsaw}
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    image: migrate/migrate:4
+    profiles: ["tools"]
+    command: ["-help"]
+    volumes:
+      - ./db/migrations:/migrations:ro
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgres://moneycontrol:moneycontrol@postgres:5432/moneycontrol?sslmode=disable}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
