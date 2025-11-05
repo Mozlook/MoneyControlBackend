@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 
+	"github.com/Mozlook/MoneyControlBackend/internal/auth/jwtverifier"
 	appcfg "github.com/Mozlook/MoneyControlBackend/internal/config"
 	dbx "github.com/Mozlook/MoneyControlBackend/internal/db"
 )
@@ -24,6 +25,10 @@ var (
 func main() {
 	_ = godotenv.Load()
 	cfg := appcfg.Load()
+	ks, err := jwtverifier.LoadKeys(cfg.Auth.Keys)
+	if err != nil {
+		log.Fatalf("Error loading keys: %s", err)
+	}
 
 	if cfg.App.Env == "prod" {
 		gin.SetMode(gin.ReleaseMode)
