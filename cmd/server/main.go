@@ -15,6 +15,7 @@ import (
 	"github.com/Mozlook/MoneyControlBackend/internal/auth/jwtverifier"
 	appcfg "github.com/Mozlook/MoneyControlBackend/internal/config"
 	dbx "github.com/Mozlook/MoneyControlBackend/internal/db"
+	"github.com/Mozlook/MoneyControlBackend/internal/http/middleware"
 )
 
 var (
@@ -76,6 +77,10 @@ func main() {
 		}
 		health(c)
 	})
+
+	// Routing
+	api := r.Group("/api")
+	api.Use(middleware.RequireAuth(ver, sqlDB))
 
 	port := cfg.App.Port
 	srv := &http.Server{
