@@ -25,9 +25,15 @@ var (
 func main() {
 	_ = godotenv.Load()
 	cfg := appcfg.Load()
+
 	ks, err := jwtverifier.LoadKeys(cfg.Auth.Keys)
 	if err != nil {
 		log.Fatalf("Error loading keys: %s", err)
+	}
+
+	ver, err := jwtverifier.New(cfg.Auth, ks)
+	if err != nil {
+		log.Fatalf("Error creating verifier: %s", err)
 	}
 
 	if cfg.App.Env == "prod" {
