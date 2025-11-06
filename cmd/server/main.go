@@ -79,7 +79,7 @@ func main() {
 	})
 
 	// Routing
-	api := r.Group("/api")
+	api := r.Group("/api/v1")
 	api.Use(middleware.RequireAuth(ver, sqlDB))
 
 	port := cfg.App.Port

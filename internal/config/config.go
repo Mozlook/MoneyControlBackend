@@ -27,11 +27,21 @@ type Keys struct {
 	Kid           string
 	PublicKeyPath string
 }
+
+type Argon2 struct {
+	MemoryKiB int
+	Time      int
+	Threads   int
+	SaltLen   int
+	KeyLen    int
+}
+
 type Auth struct {
 	Issuer       string
 	Audience     string
 	AccessLeeway time.Duration
 	Keys         []Keys
+	Password     Argon2
 }
 
 // Global config root
@@ -75,6 +85,13 @@ func Load() Config {
 				Kid:           get("AUTH_JWT_KID", "1234"),
 				PublicKeyPath: get("AUTH_JWT_PUBLIC_KEY_PATH", "~/.secrets/jwt_rsa_pub.pem"),
 			}},
+			Password: Argon2{
+				MemoryKiB: getInt("ARGON2_MEMORY_KIB", 65536),
+				Time:      getInt("ARGON2_TIME", 3),
+				Threads:   getInt("ARGON2_THREADS", 4),
+				SaltLen:   getInt("ARGON2_SALT_LEN", 16),
+				KeyLen:    getInt("ARGON2_KEY_LEN", 32),
+			},
 		},
 	}
 }
