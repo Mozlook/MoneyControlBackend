@@ -1,0 +1,169 @@
+openapi: 3.1.0
+info:
+  title: MoneyControl API
+  version: "0.1.0"
+  description: >
+    Minimal spec covering **register** endpoint. Extend this file as you add more routes.
+servers:
+  - url: http://localhost:8080
+    description: Local dev
+
+paths:
+  /api/v1/auth/register:
+    post:
+      summary: Register new user
+      description: Creates a user account and stores Argon2id password hash.
+      tags: [Auth]
+      security: [] # public endpoint (no Bearer required)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+            examples:
+              sample:
+                value:
+                  email: "user@example.com"
+                  password: "correct-horse-battery-staple"
+                  timezone: "Europe/Warsaw"
+                  period_anchor_day: 10
+                  home_currency: "PLN"
+      responses:
+        "201":
+          description: User created
+          headers:
+            Location:
+              description: URL of the created user resource
+              schema:
+                type: string
+                example: /api/v1/users/9e2a6c3a-8f2f-4e61-9d7a-8e4d4a1b2c7f
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegisterResponse"
+              examples:
+                success:
+                  value:
+                    user_id: "9e2a6c3a-8f2f-4e61-9d7a-8e4d4a1b2c7f"
+                    email: "user@example.com"
+                    timezone: "Europe/Warsaw"
+                    period_anchor_day: 10
+                    home_currency: "PLN"
+                    created_at: "2025-11-06T10:15:00Z"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+              examples:
+                bad_input:
+                  value:
+                    error: "validation_error"
+                    fields:
+                      email: "invalid format"
+                      password: "min length is 12"
+                      timezone: "unknown IANA zone"
+        "409":
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConflictError"
+              examples:
+                exists:
+                  value:
+                    error: "conflict"
+                    message: "email already in use"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServerError"
+
+components:
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [email, password, timezone, period_anchor_day, home_currency]
+      properties:
+        email:
+          type: string
+          format: email
+          description: User email; stored in lower-case.
+          examples: ["user@example.com"]
+        password:
+          type: string
+          minLength: 12
+          maxLength: 128
+          description: Plaintext password (will be hashed with Argon2id).
+        timezone:
+          type: string
+          description: IANA timezone name.
+          examples: ["Europe/Warsaw"]
+        period_anchor_day:
+          type: integer
+          minimum: 1
+          maximum: 31
+          description: Billing period anchor day (1..31).
+        home_currency:
+          type: string
+          pattern: "^[A-Z]{3}$"
+          description: ISO 4217 currency code.
+          examples: ["PLN"]
+    RegisterResponse:
+      type: object
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        timezone:
+          type: string
+        period_anchor_day:
+          type: integer
+        home_currency:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required:
+        [user_id, email, timezone, period_anchor_day, home_currency, created_at]
+
+    ValidationError:
+      type: object
+      properties:
+        error:
+          type: string
+          example: validation_error
+        fields:
+          type: object
+          additionalProperties:
+            type: string
+      required: [error, fields]
+
+    ConflictError:
+      type: object
+      properties:
+        error:
+          type: string
+          example: conflict
+        message:
+          type: string
+          example: email already in use
+      required: [error, message]
+
+    ServerError:
+      type: object
+      properties:
+        error:
+          type: string
+          example: server_error
+        message:
+          type: string
+          example: unexpected error
+      required: [error]

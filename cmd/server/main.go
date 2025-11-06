@@ -15,6 +15,7 @@ import (
 	"github.com/Mozlook/MoneyControlBackend/internal/auth/jwtverifier"
 	appcfg "github.com/Mozlook/MoneyControlBackend/internal/config"
 	dbx "github.com/Mozlook/MoneyControlBackend/internal/db"
+	handlers "github.com/Mozlook/MoneyControlBackend/internal/http/handlers/auth"
 	"github.com/Mozlook/MoneyControlBackend/internal/http/middleware"
 )
 
@@ -81,6 +82,11 @@ func main() {
 	// Routing
 	api := r.Group("/api/v1")
 	api.Use(middleware.RequireAuth(ver, sqlDB))
+
+	authHandlers := handlers.NewAuthHandlers(sqlDB, cfg.Auth.Password)
+
+	public := r.Group("/api/v1/auth") // publiczna grupa (bez RequireAuth)
+	public.POST("/register", authHandlers.Register())
 
 	port := cfg.App.Port
 	srv := &http.Server{

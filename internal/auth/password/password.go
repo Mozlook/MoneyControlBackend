@@ -51,7 +51,6 @@ func Verify(plain, phc string) (bool, error) {
 	}
 
 	parts := strings.Split(phc, "$")
-	// parts: ["", "argon2id", "v=19", "m=...,t=...,p=...", "<saltB64>", "<hashB64>"]
 	if len(parts) != 6 || parts[1] != "argon2id" {
 		return false, fmt.Errorf("unsupported or malformed PHC")
 	}
@@ -59,7 +58,6 @@ func Verify(plain, phc string) (bool, error) {
 		return false, fmt.Errorf("unsupported version: %s", parts[2])
 	}
 
-	// Parse m, t, p
 	m, t, p, err := parseParams(parts[3])
 	if err != nil {
 		return false, fmt.Errorf("bad params: %w", err)
@@ -68,7 +66,6 @@ func Verify(plain, phc string) (bool, error) {
 		return false, fmt.Errorf("non-positive param(s)")
 	}
 
-	// Decode salt and expected hash (base64 raw, no padding)
 	salt, err := base64.RawStdEncoding.DecodeString(parts[4])
 	if err != nil {
 		return false, fmt.Errorf("bad salt base64: %w", err)
@@ -81,7 +78,6 @@ func Verify(plain, phc string) (bool, error) {
 		return false, fmt.Errorf("invalid salt/hash length")
 	}
 
-	// Recompute using PHC parameters and salt. Key length must match expected length.
 	derived := argon2.IDKey(
 		[]byte(plain),
 		salt,
@@ -91,7 +87,6 @@ func Verify(plain, phc string) (bool, error) {
 		uint32(len(expected)),
 	)
 
-	// Constant-time compare
 	if len(derived) != len(expected) {
 		return false, nil
 	}
@@ -99,7 +94,6 @@ func Verify(plain, phc string) (bool, error) {
 	return ok, nil
 }
 
-// parseParams parses "m=<KiB>,t=<time>,p=<threads>" into integers.
 func parseParams(s string) (m, t, p int, err error) {
 	kv := strings.Split(s, ",")
 	if len(kv) < 3 {
