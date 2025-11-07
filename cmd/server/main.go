@@ -85,7 +85,7 @@ func main() {
 
 	authHandlers := handlers.NewAuthHandlers(sqlDB, cfg.Auth.Password)
 
-	public := r.Group("/api/v1/auth") // publiczna grupa (bez RequireAuth)
+	public := r.Group("/api/v1/auth")
 	public.POST("/register", authHandlers.Register())
 
 	port := cfg.App.Port

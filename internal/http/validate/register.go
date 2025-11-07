@@ -58,17 +58,17 @@ func ValidatePassword(raw string) error {
 	return nil
 }
 
-func ValidateTimezone(raw string) error {
+func ValidateTimezone(raw string) (string, error) {
 	trimmedRaw := strings.TrimSpace(raw)
 	if trimmedRaw == "" {
-		return ErrEmptyTimezone
+		return "", ErrEmptyTimezone
 	}
 
 	_, err := time.LoadLocation(trimmedRaw)
 	if err != nil {
-		return ErrUnknownTimezone
+		return "", ErrUnknownTimezone
 	}
-	return nil
+	return trimmedRaw, nil
 }
 
 func ValidatePeriodAnchorDay(raw int) error {

@@ -33,7 +33,7 @@ func New(auth appcfg.Auth, ks KeyStore) (*Verifier, error) {
 	if verifier.leeway < 0 {
 		return nil, fmt.Errorf("auth leeway must be >= 0")
 	}
-	if len(ks) > 0 {
+	if len(ks) <= 0 {
 		return nil, fmt.Errorf("no public keys loaded")
 	}
 
