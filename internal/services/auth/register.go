@@ -31,12 +31,10 @@ func Register(ctx context.Context, repos repos.Repos, argon2Cfg *appcfg.Argon2, 
 		HomeCurrency:    input.HomeCurrency,
 		PeriodAnchorDay: input.PeriodAnchorDay,
 		CreatedAt:       now,
-		UpdatedAt:       now,
 	}
 
 	userPwd := models.UserPassword{
 		UserID:    user.ID,
-		Algo:      "argon2id",
 		Hash:      phc,
 		CreatedAt: now,
 	}

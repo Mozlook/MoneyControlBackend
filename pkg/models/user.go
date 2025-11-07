@@ -13,12 +13,10 @@ type User struct {
 	HomeCurrency    string    `json:"home_currency"`
 	PeriodAnchorDay int       `json:"period_anchor_day"`
 	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
 }
 
 type UserPassword struct {
 	UserID    uuid.UUID `json:"-"`
-	Algo      string    `json:"-"`
 	Hash      string    `json:"-"`
 	CreatedAt time.Time `json:"-"`
 }
