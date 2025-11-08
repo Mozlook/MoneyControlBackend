@@ -14,6 +14,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+var registerFunc = services.Register
+
 type AuthHandlers struct {
 	DB     *sql.DB
 	PwdCfg appcfg.Argon2
@@ -69,7 +71,7 @@ func (h *AuthHandlers) Register() gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal"})
 			return
 		}
-		user, err := services.Register(c.Request.Context(), store, &h.PwdCfg, registerInput)
+		user, err := registerFunc(c.Request.Context(), store, &h.PwdCfg, registerInput)
 		if err != nil {
 			if errors.Is(err, services.ErrEmailTaken) {
 				c.JSON(http.StatusConflict, gin.H{"code": "email_taken", "message": "Email already registered"})

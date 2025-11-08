@@ -14,10 +14,13 @@ import (
 	"github.com/Mozlook/MoneyControlBackend/pkg/models"
 )
 
-var ErrEmailTaken = errors.New("email_taken")
+var (
+	ErrEmailTaken = errors.New("email_taken")
+	hashFunc      = password.Hash
+)
 
 func Register(ctx context.Context, repos repos.Repos, argon2Cfg *appcfg.Argon2, input models.RegisterInput) (models.User, error) {
-	phc, err := password.Hash(input.PlainPassword, *argon2Cfg)
+	phc, err := hashFunc(input.PlainPassword, *argon2Cfg)
 	if err != nil {
 		return models.User{}, err
 	}
