@@ -4,8 +4,11 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/Mozlook/MoneyControlBackend/internal/repos"
 	"github.com/Mozlook/MoneyControlBackend/pkg/models"
 )
+
+var _ repos.UsersRepo = (*SQLUsersRepo)(nil)
 
 type SQLUsersRepo struct {
 	Tx *sql.Tx
