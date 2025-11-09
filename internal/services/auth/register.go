@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgconn"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/Mozlook/MoneyControlBackend/internal/auth/password"
 	appcfg "github.com/Mozlook/MoneyControlBackend/internal/config"
@@ -50,9 +50,7 @@ func Register(ctx context.Context, repos repos.Repos, argon2Cfg *appcfg.Argon2, 
 
 	if err := repos.Users(tx).Insert(ctx, &user); err != nil {
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) &&
-			pgErr.Code == "23505" &&
-			(pgErr.ConstraintName == "users_email_key" || pgErr.ConstraintName == "users_email_lower_idx") {
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 			return models.User{}, ErrEmailTaken
 		}
 		return models.User{}, err
