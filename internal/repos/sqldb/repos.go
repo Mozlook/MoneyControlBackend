@@ -49,5 +49,5 @@ func (r *SQLRepos) Sessions(tx repos.Tx) repos.SessionsRepo {
 	if !ok {
 		panic("sqldb.SessionRepo: tx is not *sqldb.SQLTx")
 	}
-	return &SQLSessionRepo{Tx: sqlTxWrapper.Tx}
+	return &SQLSessionsRepo{Tx: sqlTxWrapper.Tx}
 }
