@@ -43,3 +43,11 @@ func (r *SQLRepos) Passwords(tx repos.Tx) repos.PasswordsRepo {
 	}
 	return &SQLPasswordsRepo{Tx: sqlTxWrapper.Tx}
 }
+
+func (r *SQLRepos) Sessions(tx repos.Tx) repos.SessionsRepo {
+	sqlTxWrapper, ok := tx.(*SQLTx)
+	if !ok {
+		panic("sqldb.SessionRepo: tx is not *sqldb.SQLTx")
+	}
+	return &SQLSessionRepo{Tx: sqlTxWrapper.Tx}
+}
