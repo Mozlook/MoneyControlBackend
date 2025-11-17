@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -11,6 +12,8 @@ import (
 	appcfg "github.com/Mozlook/MoneyControlBackend/internal/config"
 	"golang.org/x/crypto/argon2"
 )
+
+var ErrUnsupportedPHC = errors.New("unsupported or malformed PHC")
 
 func Hash(plain string, cfg appcfg.Argon2) (string, error) {
 	if plain == "" {
@@ -51,8 +54,8 @@ func Verify(plain, phc string) (bool, error) {
 	}
 
 	parts := strings.Split(phc, "$")
-	if len(parts) != 6 || parts[1] != "argon2id" {
-		return false, fmt.Errorf("unsupported or malformed PHC")
+	if len(parts) < 6 || parts[1] != "argon2id" {
+		return false, ErrUnsupportedPHC
 	}
 	if parts[2] != "v=19" {
 		return false, fmt.Errorf("unsupported version: %s", parts[2])
@@ -66,11 +69,11 @@ func Verify(plain, phc string) (bool, error) {
 		return false, fmt.Errorf("non-positive param(s)")
 	}
 
-	salt, err := base64.RawStdEncoding.DecodeString(parts[4])
+	salt, err := b64decode(parts[4])
 	if err != nil {
 		return false, fmt.Errorf("bad salt base64: %w", err)
 	}
-	expected, err := base64.RawStdEncoding.DecodeString(parts[5])
+	expected, err := b64decode(parts[5])
 	if err != nil {
 		return false, fmt.Errorf("bad hash base64: %w", err)
 	}
@@ -87,9 +90,6 @@ func Verify(plain, phc string) (bool, error) {
 		uint32(len(expected)),
 	)
 
-	if len(derived) != len(expected) {
-		return false, nil
-	}
 	ok := subtle.ConstantTimeCompare(derived, expected) == 1
 	return ok, nil
 }
@@ -124,4 +124,11 @@ func parseParams(s string) (m, t, p int, err error) {
 		return 0, 0, 0, fmt.Errorf("missing m/t/p")
 	}
 	return m, t, p, nil
+}
+
+func b64decode(s string) ([]byte, error) {
+	if b, err := base64.RawStdEncoding.DecodeString(s); err == nil {
+		return b, nil
+	}
+	return base64.StdEncoding.DecodeString(s)
 }

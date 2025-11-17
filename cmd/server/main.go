@@ -10,8 +10,10 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/joho/godotenv"
 
+	"github.com/Mozlook/MoneyControlBackend/internal/auth/jwtsigner"
 	"github.com/Mozlook/MoneyControlBackend/internal/auth/jwtverifier"
 	appcfg "github.com/Mozlook/MoneyControlBackend/internal/config"
 	dbx "github.com/Mozlook/MoneyControlBackend/internal/db"
@@ -36,6 +38,23 @@ func main() {
 	ver, err := jwtverifier.New(cfg.Auth, ks)
 	if err != nil {
 		log.Fatalf("Error creating verifier: %s", err)
+	}
+
+	pem, err := os.ReadFile(cfg.Auth.SigningKeyPath)
+	if err != nil {
+		log.Fatalf("read signing key: %v", err)
+	}
+
+	key, err := jwt.ParseRSAPrivateKeyFromPEM(pem)
+	if err != nil {
+		log.Fatalf("parse signing key: %v", err)
+	}
+
+	signer, err := jwtsigner.NewRS256Signer(
+		key, cfg.Auth.Issuer, cfg.Auth.Audience, cfg.Auth.SigningKeyID, cfg.Auth.AccessTokenTTL,
+	)
+	if err != nil {
+		log.Fatalf("init signer: %v", err)
 	}
 
 	if cfg.App.Env == "prod" {
@@ -84,9 +103,11 @@ func main() {
 	api.Use(middleware.RequireAuth(ver, sqlDB))
 
 	authHandlers := handlers.NewAuthHandlers(sqlDB, cfg.Auth.Password)
+	authHandlers.WithJWT(signer, 720*time.Hour)
 
 	public := r.Group("/api/v1/auth")
 	public.POST("/register", authHandlers.Register())
+	public.POST("/login", authHandlers.Login())
 
 	port := cfg.App.Port
 	srv := &http.Server{

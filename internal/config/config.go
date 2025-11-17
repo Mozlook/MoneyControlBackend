@@ -37,11 +37,14 @@ type Argon2 struct {
 }
 
 type Auth struct {
-	Issuer       string
-	Audience     string
-	AccessLeeway time.Duration
-	Keys         []Keys
-	Password     Argon2
+	Issuer         string
+	Audience       string
+	AccessLeeway   time.Duration
+	Keys           []Keys
+	Password       Argon2
+	SigningKeyID   string
+	SigningKeyPath string
+	AccessTokenTTL time.Duration
 }
 
 // Global config root
@@ -78,9 +81,12 @@ func Load() Config {
 			ConnMaxLifetime: getDuration("DB_CONN_MAX_LIFETIME", 30*time.Minute),
 		},
 		Auth: Auth{
-			Issuer:       get("AUTH_ISSUER", "moneycontrol-backend"),
-			Audience:     get("AUTH_AUDIENCE", "moneycontrol-api"),
-			AccessLeeway: getDuration("AUTH_ACCESS_LEEWAY", 60*time.Second),
+			Issuer:         get("AUTH_ISSUER", "moneycontrol-backend"),
+			Audience:       get("AUTH_AUDIENCE", "moneycontrol-api"),
+			AccessLeeway:   getDuration("AUTH_ACCESS_LEEWAY", 60*time.Second),
+			SigningKeyID:   get("AUTH_SIGNING_KID", "local-1"),
+			SigningKeyPath: get("AUTH_SIGNING_PRIVATE_KEY_PATH", "~/.secrets/jwt_rsa_priv.pem"),
+			AccessTokenTTL: getDuration("AUTH_ACCESS_TOKEN_TTL", 15*time.Minute),
 			Keys: []Keys{{
 				Kid:           get("AUTH_JWT_KID", "1234"),
 				PublicKeyPath: get("AUTH_JWT_PUBLIC_KEY_PATH", "~/.secrets/jwt_rsa_pub.pem"),

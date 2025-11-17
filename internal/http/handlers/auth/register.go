@@ -1,12 +1,10 @@
 package handlers
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
 
-	appcfg "github.com/Mozlook/MoneyControlBackend/internal/config"
 	"github.com/Mozlook/MoneyControlBackend/internal/http/validate"
 	"github.com/Mozlook/MoneyControlBackend/internal/repos/sqldb"
 	services "github.com/Mozlook/MoneyControlBackend/internal/services/auth"
@@ -15,15 +13,6 @@ import (
 )
 
 var registerFunc = services.Register
-
-type AuthHandlers struct {
-	DB     *sql.DB
-	PwdCfg appcfg.Argon2
-}
-
-func NewAuthHandlers(db *sql.DB, pwdCfg appcfg.Argon2) *AuthHandlers {
-	return &AuthHandlers{DB: db, PwdCfg: pwdCfg}
-}
 
 func (h *AuthHandlers) Register() gin.HandlerFunc {
 	return func(c *gin.Context) {
