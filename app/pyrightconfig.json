@@ -1,0 +1,11 @@
+{
+  "include": ["app"],
+  "venvPath": ".",
+  "venv": ".venv",
+  "typeCheckingMode": "basic",
+  "reportMissingImports": "none",
+  "reportUnknownVariableType": "none",
+  "reportCallInDefaultInitializer": "none",
+  "reportUnknownArgumentType": "none",
+  "reportUnannotatedClassAttribute": "none"
+}
