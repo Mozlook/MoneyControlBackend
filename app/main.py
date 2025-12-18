@@ -4,10 +4,14 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from .deps import get_db
+from .routers import auth, users
 
 app = FastAPI()
 
 DbSession = Annotated[Session, Depends(get_db)]
+
+app.include_router(auth.router)
+app.include_router(users.router)
 
 
 @app.get("/health")

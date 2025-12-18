@@ -7,5 +7,11 @@
   "reportUnknownVariableType": "none",
   "reportCallInDefaultInitializer": "none",
   "reportUnknownArgumentType": "none",
-  "reportUnannotatedClassAttribute": "none"
+  "reportUnannotatedClassAttribute": "none",
+  "executionEnvironments": [
+    {
+      "root": ".",
+      "extraPaths": ["."]
+    }
+  ]
 }
