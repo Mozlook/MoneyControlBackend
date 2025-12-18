@@ -17,3 +17,15 @@ class WalletRead(BaseModel):
     role: str
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class WalletMemberAdd(BaseModel):
+    user_id: UUID | None = None
+    email: str | None = None
+
+
+class MemberRead(BaseModel):
+    user_id: UUID
+    email: str
+    display_name: str | None
+    role: str

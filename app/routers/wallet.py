@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from ..deps import get_current_user, get_db
 from ..models import User, Wallet, WalletUser
-from ..schemas.wallet import WalletCreate, WalletRead
+from ..schemas.wallet import WalletCreate, WalletRead, WalletMemberAdd, MemberRead
 
 router = APIRouter(prefix="/wallets", tags=["wallets"])
 
@@ -96,4 +96,67 @@ def get_wallet(
         currency=wallet.currency,
         created_at=wallet.created_at,
         role=membership.role,
+    )
+
+
+@router.post("/{wallet_id}/members", response_model=MemberRead, status_code=201)
+def add_wallet_member(
+    wallet_id: UUID,
+    body: WalletMemberAdd,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    membership = (
+        db.query(WalletUser)
+        .filter(
+            WalletUser.wallet_id == wallet_id,
+            WalletUser.user_id == current_user.id,
+        )
+        .first()
+    )
+
+    if membership is None:
+        raise HTTPException(status_code=404, detail="Wallet not found")
+
+    if membership.role != "owner":
+        raise HTTPException(status_code=403, detail="Only owner can add members")
+
+    if body.user_id:
+        target = db.query(User).filter(User.id == body.user_id).first()
+    elif body.email:
+
+        target = db.query(User).filter(User.email == body.email).first()
+    else:
+        raise HTTPException(
+            status_code=400, detail="Either user_id or email must be provided"
+        )
+    if target is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    existing = (
+        db.query(WalletUser)
+        .filter(
+            WalletUser.wallet_id == wallet_id,
+            WalletUser.user_id == target.id,
+        )
+        .first()
+    )
+
+    if existing is not None:
+        raise HTTPException(status_code=400, detail="User is already a member")
+
+    new_membership = WalletUser(
+        wallet_id=wallet_id,
+        user_id=target.id,
+        role="editor",
+    )
+
+    db.add(new_membership)
+    db.commit()
+
+    return MemberRead(
+        user_id=target.id,
+        email=target.email,
+        display_name=target.display_name,
+        role=new_membership.role,
     )
