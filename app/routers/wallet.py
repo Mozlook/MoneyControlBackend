@@ -42,3 +42,31 @@ def create_wallet(
         created_at=wallet.created_at,
         role=membership.role,
     )
+
+
+@router.get("/", response_model=list[WalletRead], status_code=200)
+def list_wallets(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    memberships = (
+        db.query(WalletUser)
+        .filter(WalletUser.user_id == current_user.id)
+        .order_by(WalletUser.created_at)
+        .all()
+    )
+
+    result: list[WalletRead] = []
+
+    for membership in memberships:
+        wallet = membership.wallet
+        item = WalletRead(
+            id=wallet.id,
+            name=wallet.name,
+            currency=wallet.currency,
+            created_at=wallet.created_at,
+            role=membership.role,
+        )
+        result.append(item)
+
+    return result
