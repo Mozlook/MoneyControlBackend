@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict
 
 class WalletCreate(BaseModel):
     name: str
-    currency: str | None
+    currency: str | None = None
 
 
 class WalletRead(BaseModel):
