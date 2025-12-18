@@ -1,11 +1,13 @@
 from typing import Annotated
 from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..deps import get_current_user, get_db
 from ..models import User, Wallet, WalletUser
 from ..schemas.wallet import WalletCreate, WalletRead, WalletMemberAdd, MemberRead
+from ..helpers.helpers import ensure_wallet_member, ensure_wallet_owner
 
 router = APIRouter(prefix="/wallets", tags=["wallets"])
 
@@ -20,7 +22,11 @@ def create_wallet(
     if currency is None:
         currency = current_user.user_settings.currency
 
-    wallet = Wallet(name=body.name, currency=currency.upper(), owner_id=current_user.id)
+    wallet = Wallet(
+        name=body.name,
+        currency=currency.upper(),
+        owner_id=current_user.id,
+    )
     db.add(wallet)
     db.flush()
 
@@ -32,7 +38,6 @@ def create_wallet(
     db.add(membership)
 
     db.commit()
-
     db.refresh(wallet)
 
     return WalletRead(
@@ -78,16 +83,8 @@ def get_wallet(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ):
-    membership = (
-        db.query(WalletUser)
-        .filter(
-            WalletUser.wallet_id == wallet_id, WalletUser.user_id == current_user.id
-        )
-        .first()
-    )
-    if membership is None:
-        raise HTTPException(status_code=404, detail="Wallet not found")
-
+    # UŻYCIE HELPERA
+    membership = ensure_wallet_member(db, wallet_id, current_user)
     wallet = membership.wallet
 
     return WalletRead(
@@ -106,30 +103,18 @@ def add_wallet_member(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ):
-    membership = (
-        db.query(WalletUser)
-        .filter(
-            WalletUser.wallet_id == wallet_id,
-            WalletUser.user_id == current_user.id,
-        )
-        .first()
-    )
-
-    if membership is None:
-        raise HTTPException(status_code=404, detail="Wallet not found")
-
-    if membership.role != "owner":
-        raise HTTPException(status_code=403, detail="Only owner can add members")
+    _ = ensure_wallet_owner(db, wallet_id, current_user)
 
     if body.user_id:
         target = db.query(User).filter(User.id == body.user_id).first()
     elif body.email:
-
         target = db.query(User).filter(User.email == body.email).first()
     else:
         raise HTTPException(
-            status_code=400, detail="Either user_id or email must be provided"
+            status_code=400,
+            detail="Either user_id or email must be provided",
         )
+
     if target is None:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -168,17 +153,7 @@ def list_wallet_members(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ):
-    membership = (
-        db.query(WalletUser)
-        .filter(
-            WalletUser.wallet_id == wallet_id,
-            WalletUser.user_id == current_user.id,
-        )
-        .first()
-    )
-
-    if membership is None:
-        raise HTTPException(status_code=404, detail="Wallet not found")
+    _ = ensure_wallet_member(db, wallet_id, current_user)
 
     memberships = db.query(WalletUser).filter(WalletUser.wallet_id == wallet_id).all()
 
