@@ -1,6 +1,6 @@
 from typing import Annotated
-
-from fastapi import APIRouter, Depends
+from uuid import UUID
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..deps import get_current_user, get_db
@@ -70,3 +70,30 @@ def list_wallets(
         result.append(item)
 
     return result
+
+
+@router.get("/{wallet_id}", response_model=WalletRead, status_code=200)
+def get_wallet(
+    wallet_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    membership = (
+        db.query(WalletUser)
+        .filter(
+            WalletUser.wallet_id == wallet_id, WalletUser.user_id == current_user.id
+        )
+        .first()
+    )
+    if membership is None:
+        raise HTTPException(status_code=404, detail="Wallet not found")
+
+    wallet = membership.wallet
+
+    return WalletRead(
+        id=wallet.id,
+        name=wallet.name,
+        currency=wallet.currency,
+        created_at=wallet.created_at,
+        role=membership.role,
+    )
