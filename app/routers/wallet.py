@@ -160,3 +160,39 @@ def add_wallet_member(
         display_name=target.display_name,
         role=new_membership.role,
     )
+
+
+@router.get("/{wallet_id}/members", response_model=list[MemberRead], status_code=200)
+def list_wallet_members(
+    wallet_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    membership = (
+        db.query(WalletUser)
+        .filter(
+            WalletUser.wallet_id == wallet_id,
+            WalletUser.user_id == current_user.id,
+        )
+        .first()
+    )
+
+    if membership is None:
+        raise HTTPException(status_code=404, detail="Wallet not found")
+
+    memberships = db.query(WalletUser).filter(WalletUser.wallet_id == wallet_id).all()
+
+    result: list[MemberRead] = []
+
+    for m in memberships:
+        user = m.user
+
+        item = MemberRead(
+            user_id=user.id,
+            email=user.email,
+            display_name=user.display_name,
+            role=m.role,
+        )
+        result.append(item)
+
+    return result
