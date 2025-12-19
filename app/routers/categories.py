@@ -1,6 +1,6 @@
 from typing import Annotated
 from uuid import UUID
-
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -69,3 +69,27 @@ def list_category(
     )
 
     return [CategoryRead.model_validate(c) for c in categories]
+
+
+@router.delete("/{category_id}", status_code=204)
+def soft_delete_category(
+    wallet_id: UUID,
+    category_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    _ = ensure_wallet_member(db, wallet_id, current_user)
+
+    category = (
+        db.query(Category)
+        .filter(Category.wallet_id == wallet_id, Category.id == category_id)
+        .first()
+    )
+
+    if category is None or category.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="Category not found")
+
+    category.deleted_at = datetime.now(timezone.utc)
+
+    db.commit()
+    return
