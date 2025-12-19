@@ -1,11 +1,12 @@
 from typing import Annotated
 from uuid import UUID
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..deps import get_db, get_current_user
-from ..models import User, Product, Category
+from ..models import RecurringTransaction, User, Product, Category, Transaction
 from ..schemas.product import ProductCreate, ProductRead
 from ..helpers.wallets import ensure_wallet_member
 
@@ -55,16 +56,72 @@ def list_products(
     wallet_id: UUID,
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    category_id: UUID | None = None,
 ):
     _ = ensure_wallet_member(db, wallet_id, current_user)
 
-    products = (
+    query = db.query(Product).filter(
+        Product.wallet_id == wallet_id,
+        Product.deleted_at.is_(None),
+    )
+
+    if category_id is not None:
+        category = (
+            db.query(Category)
+            .filter(
+                Category.id == category_id,
+                Category.wallet_id == wallet_id,
+                Category.deleted_at.is_(None),
+            )
+            .first()
+        )
+        if category is None:
+            raise HTTPException(status_code=404, detail="Category not found")
+
+        query = query.filter(Product.category_id == category_id)
+
+    products = query.order_by(Product.created_at).all()
+
+    return [ProductRead.model_validate(p) for p in products]
+
+
+@router.delete("/{product_id}", status_code=204)
+def soft_delete_product(
+    wallet_id: UUID,
+    product_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    _ = ensure_wallet_member(db, wallet_id, current_user)
+
+    product = (
         db.query(Product)
         .filter(
+            Product.id == product_id,
             Product.wallet_id == wallet_id,
             Product.deleted_at.is_(None),
         )
-        .order_by(Product.created_at)
+        .first()
+    )
+    if product is None:
+        raise HTTPException(status_code=404, detail="product not found")
+
+    transactions = (
+        db.query(Transaction).filter(Transaction.product_id == product_id).all()
+    )
+    for t in transactions:
+        t.product_id = None
+
+    recurringTransactions = (
+        db.query(RecurringTransaction)
+        .filter(RecurringTransaction.product_id == product_id)
         .all()
     )
-    return [ProductRead.model_validate(p) for p in products]
+    for rt in recurringTransactions:
+        rt.product_id = None
+
+    product.deleted_at = datetime.now(timezone.utc)
+
+    db.commit()
+
+    return
