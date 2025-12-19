@@ -4,7 +4,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from .deps import get_db
-from .routers import auth, users, wallet
+from .routers import auth, users, wallet, categories
 
 app = FastAPI()
 
@@ -13,6 +13,7 @@ DbSession = Annotated[Session, Depends(get_db)]
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(wallet.router)
+app.include_router(categories.router)
 
 
 @app.get("/health")
