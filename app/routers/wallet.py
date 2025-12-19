@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from ..deps import get_current_user, get_db
 from ..models import User, Wallet, WalletUser
 from ..schemas.wallet import WalletCreate, WalletRead, WalletMemberAdd, MemberRead
-from ..helpers.helpers import ensure_wallet_member, ensure_wallet_owner
+from ..helpers.wallets import ensure_wallet_member, ensure_wallet_owner
 
 router = APIRouter(prefix="/wallets", tags=["wallets"])
 
