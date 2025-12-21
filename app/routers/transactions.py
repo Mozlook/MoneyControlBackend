@@ -277,3 +277,33 @@ def refund_transaction(
     db.refresh(refund)
 
     return TransactionRead.model_validate(refund)
+
+
+@router.delete("/{transaction_id}", status_code=204)
+def soft_delete_transaction(
+    wallet_id: UUID,
+    transaction_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    _ = ensure_wallet_member(db, wallet_id, current_user)
+
+    transaction = (
+        db.query(Transaction)
+        .filter(
+            Transaction.id == transaction_id,
+            Transaction.wallet_id == wallet_id,
+            Transaction.deleted_at.is_(None),
+        )
+        .first()
+    )
+
+    if transaction is None:
+        raise HTTPException(status_code=404, detail="transaction not found")
+    if transaction.refunds:
+        raise HTTPException(409, "Cannot delete transaction with refunds")
+
+    transaction.deleted_at = datetime.now(timezone.utc)
+
+    db.commit()
+    return
