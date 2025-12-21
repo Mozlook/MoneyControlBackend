@@ -118,13 +118,13 @@ def hard_delete_category(
         db.query(Transaction).filter(Transaction.category_id == category_id).all()
     )
 
-    recurringTransactions = (
+    recurring_transactions = (
         db.query(RecurringTransaction)
         .filter(RecurringTransaction.category_id == category_id)
         .all()
     )
 
-    if transactions or recurringTransactions:
+    if transactions or recurring_transactions:
         raise HTTPException(
             status_code=409,
             detail="Category is still used in transactions and cannot be hard deleted",

@@ -125,3 +125,43 @@ def soft_delete_product(
     db.commit()
 
     return
+
+
+@router.delete("/{product_id}/hard", status_code=204)
+def hard_delete_product(
+    wallet_id: UUID,
+    product_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    _ = ensure_wallet_member(db, wallet_id, current_user)
+
+    product = (
+        db.query(Product)
+        .filter(Product.id == product_id, Product.wallet_id == wallet_id)
+        .first()
+    )
+    if product is None:
+        raise HTTPException(status_code=404, detail="Product not found")
+    if product.deleted_at is None:
+        raise HTTPException(status_code=409, detail="soft delete product first")
+
+    transactions = (
+        db.query(Transaction).filter(Transaction.product_id == product_id).all()
+    )
+
+    recurring_transactions = (
+        db.query(RecurringTransaction)
+        .filter(RecurringTransaction.product_id == product_id)
+        .all()
+    )
+
+    if transactions or recurring_transactions:
+        raise HTTPException(
+            status_code=409,
+            detail="Product is still used in transactions and cannot be hard deleted",
+        )
+
+    db.delete(product)
+    db.commit()
+    return
