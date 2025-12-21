@@ -214,3 +214,66 @@ def list_transactions(
     ).all()
 
     return [TransactionRead.model_validate(t) for t in transactions]
+
+
+@router.post(
+    "/{transaction_id}/refund", response_model=TransactionRead, status_code=201
+)
+def refund_transaction(
+    wallet_id: UUID,
+    transaction_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    _ = ensure_wallet_member(db, wallet_id, current_user)
+
+    original = (
+        db.query(Transaction)
+        .filter(
+            Transaction.id == transaction_id,
+            Transaction.wallet_id == wallet_id,
+            Transaction.deleted_at.is_(None),
+        )
+        .first()
+    )
+
+    if original is None:
+        raise HTTPException(status_code=404, detail="transaction not found")
+
+    if original.refund_of_transaction_id is not None:
+        raise HTTPException(
+            status_code=400, detail="Cannot refund a refund transaction"
+        )
+    if original.refunds:
+        raise HTTPException(status_code=400, detail="Transaction already refunded")
+
+    refund_amount_base = -original.amount_base
+    if original.amount_original is not None:
+        refund_amount_original = -original.amount_original
+        refund_currency_original = original.currency_original
+        refund_fx_rate = original.fx_rate
+    else:
+        refund_amount_original = None
+        refund_currency_original = None
+        refund_fx_rate = None
+
+    refund = Transaction(
+        wallet_id=wallet_id,
+        user_id=current_user.id,
+        category_id=original.category_id,
+        product_id=original.product_id,
+        type=original.type,
+        amount_base=refund_amount_base,
+        currency_base=original.currency_base,
+        amount_original=refund_amount_original,
+        currency_original=refund_currency_original,
+        fx_rate=refund_fx_rate,
+        occurred_at=datetime.now(timezone.utc),
+        refund_of_transaction_id=original.id,
+    )
+
+    db.add(refund)
+    db.commit()
+    db.refresh(refund)
+
+    return TransactionRead.model_validate(refund)
