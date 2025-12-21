@@ -1,5 +1,7 @@
 from typing import Annotated
+from zoneinfo import ZoneInfo
 from uuid import UUID
+from datetime import date, timezone, datetime, time, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -104,3 +106,111 @@ def create_transaction(
     db.refresh(transaction)
 
     return TransactionRead.model_validate(transaction)
+
+
+@router.get("/", response_model=list[TransactionRead], status_code=200)
+def list_transactions(
+    wallet_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    # filtry:
+    from_date: date | None = None,
+    to_date: date | None = None,
+    current_period: bool = False,
+    category_id: UUID | None = None,
+    product_id: UUID | None = None,
+):
+    _ = ensure_wallet_member(db, wallet_id, current_user)
+
+    query = db.query(Transaction).filter(
+        Transaction.wallet_id == wallet_id, Transaction.deleted_at.is_(None)
+    )
+
+    if current_period:
+        settings = current_user.user_settings
+        now_utc = datetime.now(timezone.utc)
+        local_tz = ZoneInfo(settings.timezone)
+
+        now_local = now_utc.astimezone(local_tz)
+        today_local = now_local.date()
+        billing_day = settings.billing_day
+
+        year = today_local.year
+        month = today_local.month
+
+        if today_local.day >= billing_day:
+            start_local = datetime(year, month, billing_day, tzinfo=local_tz)
+
+            if month == 12:
+                end_local = datetime(year + 1, 1, billing_day, tzinfo=local_tz)
+            else:
+                end_local = datetime(year, month + 1, billing_day, tzinfo=local_tz)
+        else:
+            end_local = datetime(year, month, billing_day, tzinfo=local_tz)
+
+            if month == 1:
+                start_local = datetime(year - 1, 12, billing_day, tzinfo=local_tz)
+            else:
+                start_local = datetime(year, month - 1, billing_day, tzinfo=local_tz)
+
+        start_utc = start_local.astimezone(timezone.utc)
+        end_utc = end_local.astimezone(timezone.utc)
+
+        query = query.filter(
+            Transaction.occurred_at >= start_utc, Transaction.occurred_at < end_utc
+        )
+
+    if not current_period and (from_date or to_date):
+        settings = current_user.user_settings
+        local_tz = ZoneInfo(settings.timezone)
+
+        if from_date:
+            start_local = datetime.combine(from_date, time.min, tzinfo=local_tz)
+            start_utc = start_local.astimezone(timezone.utc)
+            query = query.filter(Transaction.occurred_at >= start_utc)
+
+        if to_date:
+            end_local = datetime.combine(to_date, time.min, tzinfo=local_tz)
+            end_local_next = end_local.replace(day=to_date.day) + timedelta(days=1)
+            end_utc = end_local_next.astimezone(timezone.utc)
+            query = query.filter(Transaction.occurred_at < end_utc)
+
+    if category_id is not None:
+
+        category = (
+            db.query(Category)
+            .filter(
+                Category.id == category_id,
+                Category.wallet_id == wallet_id,
+                Category.deleted_at.is_(None),
+            )
+            .first()
+        )
+
+        if category is None:
+            raise HTTPException(status_code=404, detail="category not found")
+
+        query = query.filter(Transaction.category_id == category_id)
+
+    if product_id is not None:
+
+        product = (
+            db.query(Product)
+            .filter(
+                Product.id == product_id,
+                Product.wallet_id == wallet_id,
+                Product.deleted_at.is_(None),
+            )
+            .first()
+        )
+
+        if product is None:
+            raise HTTPException(status_code=404, detail="product not found")
+
+        query = query.filter(Transaction.product_id == product_id)
+
+    transactions = query.order_by(
+        Transaction.occurred_at.desc(), Transaction.created_at.desc()
+    ).all()
+
+    return [TransactionRead.model_validate(t) for t in transactions]
