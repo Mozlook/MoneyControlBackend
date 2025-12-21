@@ -12,7 +12,6 @@ class RecurringTransactionCreate(BaseModel):
     amount_base: Decimal
     currency_base: str
     description: str | None = None
-    active: bool = True
 
 
 class RecurringTransactionRead(BaseModel):
