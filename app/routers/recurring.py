@@ -171,3 +171,106 @@ def apply_recurring_transactions(
     db.commit()
 
     return [TransactionRead.model_validate(t) for t in transactions]
+
+
+@router.put("/{recurring_id}", response_model=RecurringTransactionRead, status_code=200)
+def update_recurring_transaction(
+    wallet_id: UUID,
+    recurring_id: UUID,
+    body: RecurringTransactionCreate,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    _ = ensure_wallet_member(db, wallet_id, current_user)
+
+    recurring = (
+        db.query(RecurringTransaction)
+        .filter(
+            RecurringTransaction.id == recurring_id,
+            RecurringTransaction.wallet_id == wallet_id,
+        )
+        .first()
+    )
+
+    if recurring is None:
+        raise HTTPException(status_code=404, detail="recurring not found")
+
+    wallet = recurring.wallet
+    currency_base = body.currency_base.upper()
+
+    if currency_base != wallet.currency:
+        raise HTTPException(
+            status_code=400, detail="currency_base must equal wallet currency"
+        )
+
+    category = (
+        db.query(Category)
+        .filter(
+            Category.id == body.category_id,
+            Category.wallet_id == wallet_id,
+            Category.deleted_at.is_(None),
+        )
+        .first()
+    )
+
+    if category is None:
+        raise HTTPException(status_code=404, detail="category not found")
+
+    if body.product_id:
+        product = (
+            db.query(Product)
+            .filter(
+                Product.id == body.product_id,
+                Product.wallet_id == wallet_id,
+                Product.deleted_at.is_(None),
+            )
+            .first()
+        )
+        if product is None:
+            raise HTTPException(status_code=404, detail="product not found")
+        if product.category_id != body.category_id:
+            raise HTTPException(
+                status_code=400, detail="product does not belong to this category"
+            )
+    recurring.category_id = body.category_id
+    recurring.product_id = body.product_id
+    recurring.amount_base = body.amount_base
+    recurring.currency_base = currency_base
+    recurring.description = body.description
+    recurring.updated_at = datetime.now(timezone.utc)
+
+    db.commit()
+    db.refresh(recurring)
+
+    return RecurringTransactionRead.model_validate(recurring)
+
+
+@router.delete("/{recurring_id}", status_code=204)
+def deactivate_recurring_transaction(
+    wallet_id: UUID,
+    recurring_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    _ = ensure_wallet_member(db, wallet_id, current_user)
+
+    recurring = (
+        db.query(RecurringTransaction)
+        .filter(
+            RecurringTransaction.id == recurring_id,
+            RecurringTransaction.wallet_id == wallet_id,
+        )
+        .first()
+    )
+
+    if recurring is None:
+        raise HTTPException(status_code=404, detail="recurring not found")
+
+    if recurring.active is False:
+        raise HTTPException(status_code=404, detail="recurring not found")
+
+    recurring.active = False
+    recurring.updated_at = datetime.now(timezone.utc)
+
+    db.commit()
+    return
