@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..deps import get_db, get_current_user
-from ..models import User, Category
+from ..models import RecurringTransaction, User, Category, Transaction
 from ..schemas.category import CategoryCreate, CategoryRead
 from ..helpers.wallets import ensure_wallet_member
 
@@ -91,5 +91,45 @@ def soft_delete_category(
 
     category.deleted_at = datetime.now(timezone.utc)
 
+    db.commit()
+    return
+
+
+@router.delete("/{category_id}/hard", status_code=204)
+def hard_delete_category(
+    wallet_id: UUID,
+    category_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    _ = ensure_wallet_member(db, wallet_id, current_user)
+
+    category = (
+        db.query(Category)
+        .filter(Category.id == category_id, Category.wallet_id == wallet_id)
+        .first()
+    )
+    if category is None:
+        raise HTTPException(status_code=404, detail="Category not found")
+    if category.deleted_at is None:
+        raise HTTPException(status_code=409, detail="soft delete category first")
+
+    transactions = (
+        db.query(Transaction).filter(Transaction.category_id == category_id).all()
+    )
+
+    recurringTransactions = (
+        db.query(RecurringTransaction)
+        .filter(RecurringTransaction.category_id == category_id)
+        .all()
+    )
+
+    if transactions or recurringTransactions:
+        raise HTTPException(
+            status_code=409,
+            detail="Category is still used in transactions and cannot be hard deleted",
+        )
+
+    db.delete(category)
     db.commit()
     return
