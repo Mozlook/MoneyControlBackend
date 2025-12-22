@@ -4,7 +4,16 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from .deps import get_db
-from .routers import auth, users, wallet, categories, products, transactions, recurring
+from .routers import (
+    auth,
+    users,
+    wallet,
+    categories,
+    products,
+    transactions,
+    recurring,
+    settings,
+)
 
 app = FastAPI()
 
@@ -17,6 +26,7 @@ app.include_router(categories.router)
 app.include_router(products.router)
 app.include_router(transactions.router)
 app.include_router(recurring.router)
+app.include_router(settings.router)
 
 
 @app.get("/health")
