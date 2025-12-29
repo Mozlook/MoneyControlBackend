@@ -34,3 +34,14 @@ class ImportanceSummaryRead(BaseModel):
     important: Decimal
     unnecessary: Decimal
     unassigned: Decimal
+
+
+class PeriodTotalRead(BaseModel):
+    period_start: datetime
+    period_end: datetime
+    total: Decimal
+
+
+class LastPeriodsHistoryRead(BaseModel):
+    currency: str
+    periods: list[PeriodTotalRead]
