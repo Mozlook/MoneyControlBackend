@@ -23,3 +23,14 @@ class CategoriesProductsSummaryRead(BaseModel):
     period_end: datetime
     total: Decimal
     categories: list[CategoriesWithProductsSummaryRead]
+
+
+class ImportanceSummaryRead(BaseModel):
+    currency: str
+    period_start: datetime
+    period_end: datetime
+    total: Decimal
+    necessary: Decimal
+    important: Decimal
+    unnecessary: Decimal
+    unassigned: Decimal
