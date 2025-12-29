@@ -11,11 +11,12 @@ from sqlalchemy.orm import Session
 
 from ..deps import get_current_user, get_db
 from ..helpers.wallets import ensure_wallet_member
-from ..models import Category, Product, Transaction, User
+from ..models import Category, Product, Transaction, User, ProductImportance
 from ..schemas.aggregation import (
     CategoriesProductsSummaryRead,
     CategoriesWithProductsSummaryRead,
     ProductWithSumRead,
+    ImportanceSummaryRead,
 )
 from ..schemas.category import CategoryRead
 from ..schemas.transaction import ProductInTransactionRead
@@ -237,4 +238,99 @@ def summary_by_importance(
     from_date: date | None = None,
     to_date: date | None = None,
 ):
-    _ = ensure_wallet_member(db, wallet_id, current_user)
+    membership = ensure_wallet_member(db, wallet_id, current_user)
+    currency = membership.wallet.currency
+
+    settings = current_user.user_settings
+    local_tz = ZoneInfo(settings.timezone)
+    now_utc = datetime.now(timezone.utc)
+
+    if current_period:
+        now_local = now_utc.astimezone(local_tz)
+        year = now_local.year
+        month = now_local.month
+        billing_day = settings.billing_day
+
+        if now_local.day >= billing_day:
+            period_start_local = datetime(year, month, billing_day, tzinfo=local_tz)
+            if month == 12:
+                period_end_local = datetime(year + 1, 1, billing_day, tzinfo=local_tz)
+            else:
+                period_end_local = datetime(
+                    year, month + 1, billing_day, tzinfo=local_tz
+                )
+        else:
+            period_end_local = datetime(year, month, billing_day, tzinfo=local_tz)
+            if month == 1:
+                period_start_local = datetime(
+                    year - 1, 12, billing_day, tzinfo=local_tz
+                )
+            else:
+                period_start_local = datetime(
+                    year, month - 1, billing_day, tzinfo=local_tz
+                )
+
+        period_start_utc = period_start_local.astimezone(timezone.utc)
+        period_end_utc = period_end_local.astimezone(timezone.utc)
+    else:
+        period_start_utc = datetime(1970, 1, 1, tzinfo=timezone.utc)
+        period_end_utc = now_utc
+
+        if from_date is not None:
+            start_local = datetime.combine(from_date, time.min, tzinfo=local_tz)
+            period_start_utc = start_local.astimezone(timezone.utc)
+
+        if to_date is not None:
+            end_local_exclusive = datetime.combine(
+                to_date, time.min, tzinfo=local_tz
+            ) + timedelta(days=1)
+            period_end_utc = end_local_exclusive.astimezone(timezone.utc)
+
+    query = db.query(Transaction).filter(
+        Transaction.wallet_id == wallet_id,
+        Transaction.deleted_at.is_(None),
+        Transaction.type == "expense",
+        Transaction.occurred_at >= period_start_utc,
+        Transaction.occurred_at < period_end_utc,
+    )
+
+    rows = (
+        query.outerjoin(Product, Transaction.product_id == Product.id)
+        .with_entities(
+            Product.importance,
+            func.coalesce(func.sum(Transaction.amount_base), 0).label("sum_amount"),
+        )
+        .group_by(Product.importance)
+        .all()
+    )
+
+    necessary = Decimal("0")
+    important = Decimal("0")
+    unnecessary = Decimal("0")
+    unassigned = Decimal("0")
+
+    for importance, sum_amount in rows:
+        match importance:
+            case None:
+                unassigned += sum_amount
+            case ProductImportance.IMPORTANT:
+                important += sum_amount
+
+            case ProductImportance.NECESSARY:
+                necessary += sum_amount
+
+            case ProductImportance.UNNECESSARY:
+                unnecessary += sum_amount
+
+    total = necessary + important + unnecessary + unassigned
+
+    return ImportanceSummaryRead(
+        currency=currency,
+        period_start=period_start_utc,
+        period_end=period_end_utc,
+        total=total,
+        necessary=necessary,
+        important=important,
+        unnecessary=unnecessary,
+        unassigned=unassigned,
+    )
