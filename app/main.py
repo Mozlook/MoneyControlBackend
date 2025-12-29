@@ -13,6 +13,8 @@ from .routers import (
     transactions,
     recurring,
     settings,
+    summary,
+    history,
 )
 
 app = FastAPI()
@@ -27,6 +29,8 @@ app.include_router(products.router)
 app.include_router(transactions.router)
 app.include_router(recurring.router)
 app.include_router(settings.router)
+app.include_router(summary.router)
+app.include_router(history.router)
 
 
 @app.get("/health")
