@@ -242,7 +242,7 @@ Aplikacja finansowa do śledzenia wydatków:
 > - `current_period=true` (domyślnie) → okres rozliczeniowy z `billing_day` + `timezone`
 > - `current_period=false` + `from_date`/`to_date` → zakres ręczny
 
-- [ ] **E8.1** – Kategorie + produkty + sumy w okresie
+- [x] **E8.1** – Kategorie + produkty + sumy w okresie
   - `GET /wallets/{wallet_id}/summary/categories-products`
   - zwraca:
     - listę kategorii (pola kategorii)
@@ -256,7 +256,7 @@ Aplikacja finansowa do śledzenia wydatków:
     - `from_date: date | None`
     - `to_date: date | None`
     - (opcjonalnie) `include_empty: bool = False`
-- [ ] **E8.2** – Wydatki wg ważności produktu
+- [x] **E8.2** – Wydatki wg ważności produktu
   - `GET /wallets/{wallet_id}/summary/by-importance`
   - grupuje transakcje w okresie po `Product.importance` i sumuje `amount_base`
   - zwraca obiekt typu:
@@ -265,7 +265,7 @@ Aplikacja finansowa do śledzenia wydatków:
     - `current_period: bool = True`
     - `from_date: date | None`
     - `to_date: date | None`
-- [ ] **E8.3** – Historia wydatków za ostatnie N okresów rozliczeniowych
+- [x] **E8.3** – Historia wydatków za ostatnie N okresów rozliczeniowych
   - `GET /wallets/{wallet_id}/history/last-periods?periods=6`
   - zwraca listę:
     - `{ period_start, period_end, total }`
@@ -275,7 +275,7 @@ Aplikacja finansowa do śledzenia wydatków:
 
 ## E9 – Export
 
-- [ ] **E9.1** – `GET /wallets/{wallet_id}/transactions/export?format=csv`
+- [x] **E9.1** – `GET /wallets/{wallet_id}/transactions/export?format=csv`
   - eksport transakcji z zakresu dat do CSV
 
 ---
