@@ -1,15 +1,18 @@
+import csv
+import io
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Annotated
-from zoneinfo import ZoneInfo
 from uuid import UUID
-from datetime import date, timezone, datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from fastapi.responses import StreamingResponse
+from sqlalchemy.orm import Session, joinedload
 
-from ..deps import get_db, get_current_user
+from ..deps import get_current_user, get_db
 from ..helpers.wallets import ensure_wallet_member
-from ..models import Product, User, Transaction, Category, Wallet
-from ..schemas.transaction import TransactionRead, TransactionCreate
+from ..models import Category, Product, Transaction, User, Wallet
+from ..schemas.transaction import TransactionCreate, TransactionRead
 
 router = APIRouter(
     prefix="/wallets/{wallet_id}/transactions",
@@ -307,3 +310,145 @@ def soft_delete_transaction(
 
     db.commit()
     return
+
+
+@router.get("/export", status_code=200)
+def export_transactions(
+    wallet_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    format: str = "csv",
+    current_period: bool = True,
+    from_date: date | None = None,
+    to_date: date | None = None,
+    category_id: UUID | None = None,
+    product_id: UUID | None = None,
+):
+    _ = ensure_wallet_member(db, wallet_id, current_user)
+
+    if format != "csv":
+        raise HTTPException(status_code=400, detail="Only csv supported")
+
+    settings = current_user.user_settings
+    local_tz = ZoneInfo(settings.timezone)
+    now_utc = datetime.now(timezone.utc)
+
+    if current_period:
+        now_local = now_utc.astimezone(local_tz)
+        year = now_local.year
+        month = now_local.month
+        billing_day = settings.billing_day
+
+        if now_local.day >= billing_day:
+            period_start_local = datetime(year, month, billing_day, tzinfo=local_tz)
+            if month == 12:
+                period_end_local = datetime(year + 1, 1, billing_day, tzinfo=local_tz)
+            else:
+                period_end_local = datetime(
+                    year, month + 1, billing_day, tzinfo=local_tz
+                )
+        else:
+            period_end_local = datetime(year, month, billing_day, tzinfo=local_tz)
+            if month == 1:
+                period_start_local = datetime(
+                    year - 1, 12, billing_day, tzinfo=local_tz
+                )
+            else:
+                period_start_local = datetime(
+                    year, month - 1, billing_day, tzinfo=local_tz
+                )
+
+        period_start_utc = period_start_local.astimezone(timezone.utc)
+        period_end_utc = period_end_local.astimezone(timezone.utc)
+    else:
+        period_start_utc = datetime(1970, 1, 1, tzinfo=timezone.utc)
+        period_end_utc = now_utc
+
+        if from_date is not None:
+            start_local = datetime.combine(from_date, time.min, tzinfo=local_tz)
+            period_start_utc = start_local.astimezone(timezone.utc)
+
+        if to_date is not None:
+            end_local_exclusive = datetime.combine(
+                to_date, time.min, tzinfo=local_tz
+            ) + timedelta(days=1)
+            period_end_utc = end_local_exclusive.astimezone(timezone.utc)
+
+    query = db.query(Transaction).filter(
+        Transaction.wallet_id == wallet_id,
+        Transaction.deleted_at.is_(None),
+        Transaction.occurred_at >= period_start_utc,
+        Transaction.occurred_at < period_end_utc,
+        Transaction.type == "expense",
+    )
+    if category_id:
+        query = query.filter(Transaction.category_id == category_id)
+    if product_id:
+        query = query.filter(Transaction.product_id == product_id)
+
+    query = query.options(
+        joinedload(Transaction.category),
+        joinedload(Transaction.product),
+    ).order_by(Transaction.occurred_at.desc(), Transaction.created_at.desc())
+
+    def iter_csv():
+        yield "\ufeff"
+
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+
+        writer.writerow(
+            [
+                "transaction_id",
+                "occurred_at",
+                "amount_base",
+                "currency_base",
+                "category_id",
+                "category_name",
+                "product_id",
+                "product_name",
+                "amount_original",
+                "currency_original",
+                "fx_rate",
+                "refund_of_transaction_id",
+                "created_at",
+            ]
+        )
+        yield buf.getvalue()
+        _ = buf.seek(0)
+        _ = buf.truncate(0)
+
+        for t in query.yield_per(1000):
+            writer.writerow(
+                [
+                    str(t.id),
+                    t.occurred_at.isoformat(),
+                    str(t.amount_base),
+                    t.currency_base,
+                    str(t.category_id),
+                    t.category.name if t.category else "",
+                    str(t.product_id) if t.product_id else "",
+                    t.product.name if t.product else "",
+                    str(t.amount_original) if t.amount_original is not None else "",
+                    t.currency_original or "",
+                    str(t.fx_rate) if t.fx_rate is not None else "",
+                    (
+                        str(t.refund_of_transaction_id)
+                        if t.refund_of_transaction_id
+                        else ""
+                    ),
+                    t.created_at.isoformat(),
+                ]
+            )
+            yield buf.getvalue()
+            _ = buf.seek(0)
+            _ = buf.truncate(0)
+
+    filename = f"transactions_{wallet_id}.csv"
+    headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+
+    return StreamingResponse(
+        iter_csv(),
+        media_type="text/csv; charset=utf-8",
+        headers=headers,
+    )
