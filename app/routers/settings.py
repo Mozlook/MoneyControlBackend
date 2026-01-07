@@ -8,7 +8,7 @@ from ..models import User
 from ..schemas.user_settings import UserSettingsRead, UserSettingsUpdate
 
 router = APIRouter(
-    prefix="/",
+    prefix="/settings",
     tags=["settings"],
 )
 

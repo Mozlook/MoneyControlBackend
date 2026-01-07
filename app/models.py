@@ -302,6 +302,10 @@ class Category(Base):
         back_populates="category",
     )
 
+    recurring_transactions = relationship(
+        "RecurringTransaction", back_populates="category"
+    )
+
 
 class Product(Base):
     __tablename__ = "products"
