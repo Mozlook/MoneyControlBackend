@@ -1,68 +1,62 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 
-def _add_months(dt: datetime, months: int) -> datetime:
-    """
-    Month arithmetic safe for billing_day <= 28.
-    Keeps day/time/tzinfo, changes month/year.
-    """
-    m = dt.month - 1 + months
-    year = dt.year + (m // 12)
-    month = (m % 12) + 1
-    return dt.replace(year=year, month=month)
+@dataclass(frozen=True)
+class PeriodRangeUTC:
+    period_start_utc: datetime
+    period_end_utc: datetime
 
 
 def resolve_period_range_utc(
     *,
     billing_day: int,
     timezone_name: str,
-    current_period: bool,
+    current_period: bool = True,
     from_date: date | None = None,
     to_date: date | None = None,
     now_utc: datetime | None = None,
-) -> tuple[datetime, datetime]:
+) -> PeriodRangeUTC:
     """
-    Returns (period_start_utc, period_end_utc) for DB filtering:
-        occurred_at >= period_start_utc AND occurred_at < period_end_utc
-
-    Behavior matches your current implementation:
-    - current_period=True -> billing period based on billing_day + user's timezone
-    - current_period=False -> open range:
-        start defaults to 1970-01-01 UTC (unless from_date provided)
-        end defaults to now_utc (unless to_date provided; end is exclusive)
+    Zwraca [period_start_utc, period_end_utc) (end EXCLUSIVE).
+    - current_period=True: okres wg billing_day i timezone usera
+    - current_period=False: zakres ręczny (from_date/to_date) w timezone usera
     """
-    if billing_day < 1 or billing_day > 28:
-        raise ValueError("billing_day must be between 1 and 28")
-
     local_tz = ZoneInfo(timezone_name)
-
     now_utc = now_utc or datetime.now(timezone.utc)
-    if now_utc.tzinfo is None:
-        now_utc = now_utc.replace(tzinfo=timezone.utc)
 
     if current_period:
         now_local = now_utc.astimezone(local_tz)
+        year = now_local.year
+        month = now_local.month
 
-        start_local = datetime(
-            now_local.year,
-            now_local.month,
-            billing_day,
-            tzinfo=local_tz,
+        if now_local.day >= billing_day:
+            period_start_local = datetime(year, month, billing_day, tzinfo=local_tz)
+            if month == 12:
+                period_end_local = datetime(year + 1, 1, billing_day, tzinfo=local_tz)
+            else:
+                period_end_local = datetime(
+                    year, month + 1, billing_day, tzinfo=local_tz
+                )
+        else:
+            period_end_local = datetime(year, month, billing_day, tzinfo=local_tz)
+            if month == 1:
+                period_start_local = datetime(
+                    year - 1, 12, billing_day, tzinfo=local_tz
+                )
+            else:
+                period_start_local = datetime(
+                    year, month - 1, billing_day, tzinfo=local_tz
+                )
+
+        return PeriodRangeUTC(
+            period_start_utc=period_start_local.astimezone(timezone.utc),
+            period_end_utc=period_end_local.astimezone(timezone.utc),
         )
 
-        if now_local.day < billing_day:
-            start_local = _add_months(start_local, -1)
-
-        end_local = _add_months(start_local, 1)
-
-        period_start_utc = start_local.astimezone(timezone.utc)
-        period_end_utc = end_local.astimezone(timezone.utc)
-        return period_start_utc, period_end_utc
-
-    # current_period == False: open range
     period_start_utc = datetime(1970, 1, 1, tzinfo=timezone.utc)
     period_end_utc = now_utc
 
@@ -76,4 +70,6 @@ def resolve_period_range_utc(
         ) + timedelta(days=1)
         period_end_utc = end_local_exclusive.astimezone(timezone.utc)
 
-    return period_start_utc, period_end_utc
+    return PeriodRangeUTC(
+        period_start_utc=period_start_utc, period_end_utc=period_end_utc
+    )
