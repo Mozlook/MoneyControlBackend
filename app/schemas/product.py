@@ -22,5 +22,5 @@ class ProductRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class ProductListItemRead(ProductRead):
+class ProductReadSum(ProductRead):
     period_sum: Decimal

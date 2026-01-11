@@ -173,18 +173,29 @@ def hard_delete_product(
 @router.get("/with-sum/", response_model=list[ProductReadSum], status_code=200)
 def list_products_with_sum(
     wallet_id: UUID,
-    category_id: UUID,
-    current_period: bool,
-    from_date: date | None,
-    to_date: date | None,
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    category_id: UUID | None = None,
+    current_period: bool = True,
+    from_date: date | None = None,
+    to_date: date | None = None,
 ) -> list[ProductReadSum]:
-
     _ = ensure_wallet_member(db, wallet_id, current_user)
 
-    settings = current_user.user_settings
+    if category_id is not None:
+        category = (
+            db.query(Category)
+            .filter(
+                Category.id == category_id,
+                Category.wallet_id == wallet_id,
+                Category.deleted_at.is_(None),
+            )
+            .first()
+        )
+        if category is None:
+            raise HTTPException(status_code=404, detail="Category not found")
 
+    settings = current_user.user_settings
     pr = resolve_period_range_utc(
         billing_day=settings.billing_day,
         timezone_name=settings.timezone,
@@ -209,7 +220,7 @@ def list_products_with_sum(
         .subquery()
     )
 
-    rows = (
+    products_q = (
         db.query(
             Product,
             func.coalesce(tx_sum_sq.c.period_sum, Decimal("0")).label("period_sum"),
@@ -218,12 +229,14 @@ def list_products_with_sum(
         .options(joinedload(Product.category))
         .filter(
             Product.wallet_id == wallet_id,
-            Product.category_id == category_id,
             Product.deleted_at.is_(None),
         )
-        .order_by(Product.name.asc())
-        .all()
     )
+
+    if category_id is not None:
+        products_q = products_q.filter(Product.category_id == category_id)
+
+    rows = products_q.order_by(Product.name.asc()).all()
 
     out: list[ProductReadSum] = []
     for prod, period_sum in rows:
