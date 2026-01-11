@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from ..deps import get_current_user, get_db
 from ..helpers.wallets import ensure_wallet_member
+from ..helpers.periods import resolve_period_range_utc
 from ..models import Category, Product, Transaction, User, ProductImportance
 from ..schemas.aggregation import (
     CategoriesProductsSummaryRead,
@@ -45,49 +46,14 @@ def summary_categories_products(
     currency = membership.wallet.currency
 
     settings = current_user.user_settings
-    local_tz = ZoneInfo(settings.timezone)
-    now_utc = datetime.now(timezone.utc)
 
-    if current_period:
-        now_local = now_utc.astimezone(local_tz)
-        year = now_local.year
-        month = now_local.month
-        billing_day = settings.billing_day
-
-        if now_local.day >= billing_day:
-            period_start_local = datetime(year, month, billing_day, tzinfo=local_tz)
-            if month == 12:
-                period_end_local = datetime(year + 1, 1, billing_day, tzinfo=local_tz)
-            else:
-                period_end_local = datetime(
-                    year, month + 1, billing_day, tzinfo=local_tz
-                )
-        else:
-            period_end_local = datetime(year, month, billing_day, tzinfo=local_tz)
-            if month == 1:
-                period_start_local = datetime(
-                    year - 1, 12, billing_day, tzinfo=local_tz
-                )
-            else:
-                period_start_local = datetime(
-                    year, month - 1, billing_day, tzinfo=local_tz
-                )
-
-        period_start_utc = period_start_local.astimezone(timezone.utc)
-        period_end_utc = period_end_local.astimezone(timezone.utc)
-    else:
-        period_start_utc = datetime(1970, 1, 1, tzinfo=timezone.utc)
-        period_end_utc = now_utc
-
-        if from_date is not None:
-            start_local = datetime.combine(from_date, time.min, tzinfo=local_tz)
-            period_start_utc = start_local.astimezone(timezone.utc)
-
-        if to_date is not None:
-            end_local_exclusive = datetime.combine(
-                to_date, time.min, tzinfo=local_tz
-            ) + timedelta(days=1)
-            period_end_utc = end_local_exclusive.astimezone(timezone.utc)
+    period_start_utc, period_end_utc = resolve_period_range_utc(
+        billing_day=settings.billing_day,
+        timezone_name=settings.timezone,
+        current_period=current_period,
+        from_date=from_date,
+        to_date=to_date,
+    )
 
     base_q = db.query(Transaction).filter(
         Transaction.wallet_id == wallet_id,
