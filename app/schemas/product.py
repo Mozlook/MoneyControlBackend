@@ -1,3 +1,4 @@
+from decimal import Decimal
 from pydantic import BaseModel, ConfigDict
 from uuid import UUID
 from datetime import datetime
@@ -19,3 +20,7 @@ class ProductRead(BaseModel):
     category: CategoryRead
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ProductListItemRead(ProductRead):
+    period_sum: Decimal
