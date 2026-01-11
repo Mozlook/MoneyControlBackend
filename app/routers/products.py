@@ -1,14 +1,17 @@
 from typing import Annotated
 from uuid import UUID
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy import func
+from sqlalchemy.orm import Session, joinedload
 
 from ..deps import get_db, get_current_user
 from ..models import RecurringTransaction, User, Product, Category, Transaction
-from ..schemas.product import ProductCreate, ProductRead
+from ..schemas.product import ProductCreate, ProductRead, ProductReadSum
 from ..helpers.wallets import ensure_wallet_member
+from ..helpers.periods import resolve_period_range_utc
 
 router = APIRouter(
     prefix="/wallets/{wallet_id}/products",
@@ -165,3 +168,67 @@ def hard_delete_product(
     db.delete(product)
     db.commit()
     return
+
+
+@router.get("/with-sum/", response_model=list[ProductReadSum], status_code=200)
+def list_products_with_sum(
+    wallet_id: UUID,
+    category_id: UUID,
+    current_period: bool,
+    from_date: date | None,
+    to_date: date | None,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> list[ProductReadSum]:
+
+    _ = ensure_wallet_member(db, wallet_id, current_user)
+
+    settings = current_user.user_settings
+
+    pr = resolve_period_range_utc(
+        billing_day=settings.billing_day,
+        timezone_name=settings.timezone,
+        current_period=current_period,
+        from_date=from_date,
+        to_date=to_date,
+    )
+
+    tx_sum_sq = (
+        db.query(
+            Transaction.product_id.label("product_id"),
+            func.sum(Transaction.amount_base).label("period_sum"),
+        )
+        .filter(
+            Transaction.wallet_id == wallet_id,
+            Transaction.deleted_at.is_(None),
+            Transaction.product_id.isnot(None),
+            Transaction.occurred_at >= pr.period_start_utc,
+            Transaction.occurred_at < pr.period_end_utc,
+        )
+        .group_by(Transaction.product_id)
+        .subquery()
+    )
+
+    rows = (
+        db.query(
+            Product,
+            func.coalesce(tx_sum_sq.c.period_sum, Decimal("0")).label("period_sum"),
+        )
+        .outerjoin(tx_sum_sq, tx_sum_sq.c.product_id == Product.id)
+        .options(joinedload(Product.category))
+        .filter(
+            Product.wallet_id == wallet_id,
+            Product.category_id == category_id,
+            Product.deleted_at.is_(None),
+        )
+        .order_by(Product.name.asc())
+        .all()
+    )
+
+    out: list[ProductReadSum] = []
+    for prod, period_sum in rows:
+        base = ProductRead.model_validate(prod).model_dump()
+        base["period_sum"] = period_sum
+        out.append(ProductReadSum(**base))
+
+    return out
