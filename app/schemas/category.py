@@ -20,5 +20,5 @@ class CategoryRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class CategoryListItemRead(CategoryRead):
+class CategoryReadSum(CategoryRead):
     period_sum: Decimal
