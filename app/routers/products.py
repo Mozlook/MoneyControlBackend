@@ -60,13 +60,18 @@ def list_products(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
     category_id: UUID | None = None,
+    deleted: bool = False,
 ):
     _ = ensure_wallet_member(db, wallet_id, current_user)
 
     query = db.query(Product).filter(
         Product.wallet_id == wallet_id,
-        Product.deleted_at.is_(None),
     )
+
+    if deleted:
+        query = query.filter(Product.deleted_at.isnot(None))
+    else:
+        query = query.filter(Product.deleted_at.is_(None))
 
     if category_id is not None:
         category = (
