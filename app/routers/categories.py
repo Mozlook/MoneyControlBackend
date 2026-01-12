@@ -62,15 +62,17 @@ def list_category(
     wallet_id: UUID,
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    deleted: bool = False,
 ):
     _ = ensure_wallet_member(db, wallet_id, current_user)
 
-    categories = (
-        db.query(Category)
-        .filter(Category.wallet_id == wallet_id, Category.deleted_at.is_(None))
-        .order_by(Category.created_at)
-        .all()
-    )
+    q = db.query(Category).filter(Category.wallet_id == wallet_id)
+
+    if deleted:
+        q = q.filter(Category.deleted_at.isnot(None))
+    else:
+        q = q.filter(Category.deleted_at.is_(None))
+    categories = q.order_by(Category.created_at).all()
 
     return [CategoryRead.model_validate(c) for c in categories]
 
@@ -144,7 +146,6 @@ def list_categories_with_sum(
     wallet_id: UUID,
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
-    # query params – wszystko opcjonalne / z defaultami
     current_period: bool = True,
     from_date: date | None = None,
     to_date: date | None = None,
