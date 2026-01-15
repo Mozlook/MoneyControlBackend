@@ -280,23 +280,234 @@ Aplikacja finansowa do śledzenia wydatków:
 
 ---
 
-## E10 – Frontend (MVP)
+## E10 – Frontend (MVP) – rozbudowane sprinty
 
-- [ ] **F0.1** – Setup frontend:
+### Architektura (konwencje projektu)
+
+- Metody w modułach API: `getAll`, `getById`, `create`, `update`, `delete` (+ akcje domenowe: `refund`, `apply`, `exportCsv`).
+- Endpointy trzymamy w **`apiPaths`** (single source of truth).
+- `ApiClient` (Axios) jako klasa + `ApiError`, interceptory, token z storage.
+- Routing: `/app/w/:walletId/...` (deep-linking).
+- Server-state: React Query; minimalny client-state (token, last wallet).
+
+---
+
+### Sprint FE-01 — Setup + fundamenty (DX, config, API skeleton)
+
+**Cel sprintu:** uruchomienie projektu front, przygotowanie infrastruktury (config, apiPaths, ApiClient, layout, routing).
+
+- [x] **FE-01.1** – Init projektu
   - Vite + React + TypeScript
   - Tailwind CSS
+  - React Router
   - React Query
-- [ ] **F1.1** – Integracja z Google Identity na froncie:
+- [x] **FE-01.2** – Standardy repo (DX)
+  - ESLint + Prettier
+  - aliasy importów (np. `@/`)
+  - konwencje: nazwy plików, struktura folderów
+- [x] **FE-01.3** – ENV/config (dev/prod)
+  - `.env.development` / `.env.production`
+  - `settings` wybierane na podstawie env (`VITE_ENVIRONMENT` lub `MODE`)
+  - `API_BASE_URL`, `API_PREFIX`, `TIMEOUT_MS`, `LOG_LEVEL`, `AUTH_TOKEN_KEY`
+  - (opcjonalnie) Vite proxy w dev
+- [x] **FE-01.4** – `apiPaths` (single source of truth)
+  - `auth`, `users`, `wallets`, `categories`, `products`, `transactions`, `recurring`, `summary`, `history`
+  - ścieżki dynamiczne jako funkcje (np. `wallet(walletId)`, `refund(walletId, transactionId)`)
+- [x] **FE-01.5** – `ApiError` + `ApiClient` (Axios)
+  - interceptors: token w request + mapowanie błędów
+  - standard zwracania `.data` w helperach (`get/post/put/patch/delete/download`)
+  - globalne zachowanie dla `401` (logout event)
+- [x] **FE-01.6** – Skeleton modułów API
+  - `authApi`, `usersApi`, `walletsApi`, `walletMembersApi`, `categoriesApi`, `productsApi`, `transactionsApi`, `recurringApi`, `summaryApi`, `historyApi`
+  - konwencja metod: `getAll`, `getById`, `create`, `update`, `delete`, `download`, akcje domenowe
+- [x] **FE-01.7** – UI baza (minimalny kit)
+  - Button, Input, Select, Modal, Spinner, EmptyState, Toast/Notifications
+- [x] **FE-01.8** – Routing skeleton (puste strony)
+  - `/login`
+  - `/app/wallets`
+  - `/app/w/:walletId/dashboard`
+  - `/app/w/:walletId/transactions`
+  - `/app/w/:walletId/catalog`
+  - `/app/w/:walletId/recurring`
+  - `/app/w/:walletId/members`
+  - `/app/settings`
+- [x] **FE-01.9** – Layout skeleton
+  - `AppLayout` (shell: sidebar/topbar + outlet)
+  - placeholder nav
+
+**DoD (FE-01):** projekt się buduje i odpala, routing działa, istnieje `apiPaths` + `ApiClient` + podstawowy layout.
+
+---
+
+### Sprint FE-02 — Auth + sesja + ochrona routingu
+
+**Cel sprintu:** działające logowanie przez Google + sesja + ochrona ekranów.
+
+- [x] **FE-02.1** – `/login` – integracja z Google Identity
   - pobranie `id_token`
-  - wysłanie do `POST /auth/google`
-- [ ] **F1.2** – Trzymanie `access_token` (localStorage / cookie)
-- [ ] **F1.3** – Wyświetlanie danych z `GET /users/me`
-- [ ] **F2** – UI do portfeli:
-  - lista portfeli
-  - przełączanie portfela
-- [ ] **F3** – UI do kategorii/produktów i transakcji (MVP):
-  - lista transakcji w bieżącym okresie
-  - formularz dodawania wydatku
+  - call `authApi.loginWithGoogle(id_token)` → JWT
+- [x] **FE-02.2** – Token storage
+  - zapis/odczyt/clear `access_token` w localStorage (`AUTH_TOKEN_KEY`)
+- [x] **FE-02.3** – `ProtectedRoute`
+  - blokuje `/app/*` bez tokena
+  - redirect do `/login`
+- [x] **FE-02.4** – Pobranie usera
+  - `usersApi.getMe()` (React Query)
+  - pokaz w topbar (display_name/email)
+- [x] **FE-02.5** – Obsługa 401
+  - event z `ApiClient` → logout + redirect + toast
+- [x] **FE-02.6** – Logout w UI
+
+**DoD (FE-02):** login działa end-to-end, bez tokena nie wejdziesz do app, a 401 kończy sesję.
+
+---
+
+### Sprint FE-03 — Portfele: lista, tworzenie, przełączanie, wallet layout
+
+**Cel sprintu:** użytkownik zarządza portfelami i porusza się w kontekście `walletId`.
+
+- [x] **FE-03.1** – `/app/wallets` – lista portfeli
+  - `walletsApi.getAll()`
+- [x] **FE-03.2** – Tworzenie portfela
+  - `walletsApi.create()`
+- [x] **FE-03.3** – Wallet switcher w layout
+  - zapamiętywanie “last wallet” (localStorage)
+- [x] **FE-03.4** – `WalletLayout` dla `/app/w/:walletId/*`
+  - ładuje `walletsApi.getById(walletId)`
+  - pokazuje nazwę/walutę, role badge
+- [x] **FE-03.5** – Obsługa błędów dostępu do walleta
+  - 403/404 → komunikat + link do listy portfeli
+
+**DoD (FE-03):** użytkownik ma płynny wybór portfela, URL z `walletId` jest źródłem prawdy.
+
+---
+
+### Sprint FE-04 — Members (współdzielenie portfela)
+
+**Cel sprintu:** owner zarządza członkami portfela.
+
+- [x] **FE-04.1** – Lista członków
+  - `walletMembersApi.getAll(walletId)`
+- [x] **FE-04.2** – Dodanie członka (owner-only)
+  - `walletMembersApi.create(walletId, data)` (email/user_id)
+- [x] **FE-04.3** – Role-based UI
+  - editor nie widzi akcji admina
+- [x] **FE-04.4** – UX: empty state + sensowne błędy
+
+**DoD (FE-04):** owner dodaje usera do portfela, widoczność akcji zależna od roli.
+
+---
+
+### Sprint FE-05 — Katalog: kategorie + produkty (CRUD MVP)
+
+**Cel sprintu:** utrzymanie katalogu pod transakcje i recurring.
+
+- [x] **FE-05.1** – Kategorie: lista + create
+  - `categoriesApi.getAll(walletId)`
+  - `categoriesApi.create(walletId, ...)`
+- [x] **FE-05.2** – Produkty: lista + create
+  - `productsApi.getAll(walletId, { category_id? })`
+  - `productsApi.create(walletId, ...)` (importance)
+- [x] **FE-05.3** – Soft delete
+  - `categoriesApi.delete(walletId, categoryId)`
+  - `productsApi.delete(walletId, productId)`
+- [x] **FE-05.4** – (Opcjonalnie MVP+) Hard delete flow
+  - `categoriesApi.hardDelete(...)`, `productsApi.hardDelete(...)`
+  - UX: tylko gdy spełnia warunki (soft-delete wcześniej + brak referencji)
+- [x] **FE-05.5** – Formularze + walidacje
+  - podstawowa walidacja pól
+  - komunikaty z API (unikalność name)
+
+**DoD (FE-05):** katalog działa w pełnym MVP (co najmniej create + list + soft-delete).
+
+---
+
+### Sprint FE-06 — Transakcje (core MVP) + refund + export CSV
+
+**Cel sprintu:** pełna obsługa transakcji w bieżącym okresie + filtry + refund + export.
+
+- [x] **FE-06.1** – Lista transakcji
+  - `transactionsApi.getAll(walletId, filters)`
+  - domyślnie: `current_period=true`
+- [x] **FE-06.2** – Filtry
+  - date range
+  - category/product
+  - przełącznik “current period” vs zakres ręczny
+- [ ] **FE-06.3** – Dodanie transakcji (formularz)
+  - amount_base + occurred_at + category/product
+  - tryb FX (opcjonalny): amount_original + currency_original + fx_rate
+- [ ] **FE-06.4** – Refund
+  - `transactionsApi.refund(walletId, transactionId)`
+- [ ] **FE-06.5** – Soft delete
+  - `transactionsApi.delete(walletId, transactionId)`
+- [ ] **FE-06.6** – Export CSV
+  - `transactionsApi.exportCsv(walletId, filters)` (download Blob)
+  - poprawna nazwa pliku
+- [ ] **FE-06.7** – UX
+  - loading states, empty states, toasty
+  - invalidacje query po mutacjach
+
+**DoD (FE-06):** użytkownik prowadzi wydatki i potrafi eksportować historię.
+
+---
+
+### Sprint FE-07 — Stałe koszty (recurring) + Apply
+
+**Cel sprintu:** pełna obsługa recurring i generowanie transakcji na okres.
+
+- [ ] **FE-07.1** – Lista recurring
+  - `recurringApi.getAll(walletId, { active? })`
+- [ ] **FE-07.2** – Dodanie recurring
+  - `recurringApi.create(walletId, ...)`
+- [ ] **FE-07.3** – Edycja recurring
+  - `recurringApi.update(walletId, recurringId, ...)`
+- [ ] **FE-07.4** – Deaktywacja
+  - `recurringApi.delete(walletId, recurringId)` (active=false)
+- [ ] **FE-07.5** – Apply recurring
+  - `recurringApi.apply(walletId)`
+  - UX: confirm modal + komunikat sukcesu
+- [ ] **FE-07.6** – Spójność danych
+  - invalidacje: transactions + summary + history
+
+**DoD (FE-07):** recurring działa end-to-end, a apply wpływa na listy i dashboard.
+
+---
+
+### Sprint FE-08 — Dashboard + Ustawienia użytkownika + final polish (MVP domknięcie)
+
+**Cel sprintu:** dashboard i settings oraz dopięcie jakości i spójności UX.
+
+#### Dashboard
+
+- [ ] **FE-08.1** – By-importance
+  - `summaryApi.byImportance(walletId, range)`
+- [ ] **FE-08.2** – Categories-products
+  - `summaryApi.categoriesProducts(walletId, range)`
+  - widok drzewka: kategorie → produkty, sumy + no-product
+- [ ] **FE-08.3** – Historia N okresów
+  - `historyApi.lastPeriods(walletId, periods)`
+  - MVP: tabela (opcjonalnie wykres jako upgrade)
+
+#### Ustawienia usera
+
+- [ ] **FE-08.4** – `/app/settings` – settings read + update
+  - `usersApi.getSettings()`
+  - `usersApi.updateSettings()`
+- [ ] **FE-08.5** – Reakcja na zmianę settings
+  - odświeżenie danych zależnych od billing day/timezone
+
+#### Polish
+
+- [ ] **FE-08.6** – Spójne komunikaty błędów (ApiError → UI)
+- [ ] **FE-08.7** – Skeletony i empty states na wszystkich ekranach
+- [ ] **FE-08.8** – Role-based UI (owner/editor) wszędzie gdzie potrzeba
+- [ ] **FE-08.9** – Responsywność
+- [ ] **FE-08.10** – README (runbook)
+  - uruchomienie dev
+  - konfiguracja env
+  - opis architektury API (`apiPaths`, `ApiClient`, moduły)
+
+**DoD (FE-08):** dashboard i settings działają, MVP gotowe do release.
 
 ---
 

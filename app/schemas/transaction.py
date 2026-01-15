@@ -17,12 +17,8 @@ class ProductInTransactionRead(BaseModel):
 class TransactionCreate(BaseModel):
     category_id: UUID
     product_id: UUID | None = None
-    amount_base: Decimal
-    currency_base: str
-    amount_original: Decimal | None = None
-    currency_original: str | None = None
-    fx_rate: Decimal | None = None
-    occurred_at: datetime
+    amount: Decimal
+    currency: str
 
 
 class TransactionRead(BaseModel):

@@ -1,6 +1,7 @@
 import csv
 import io
 from datetime import date, datetime, time, timedelta, timezone
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Annotated
 from uuid import UUID
 from zoneinfo import ZoneInfo
@@ -20,6 +21,45 @@ router = APIRouter(
 )
 
 
+FX_TO_PLN: dict[str, Decimal] = {
+    "PLN": Decimal("1"),
+    "EUR": Decimal("4.30"),
+    "USD": Decimal("3.95"),
+}
+
+TWOPLACES = Decimal("0.01")
+
+
+def _q2(x: Decimal) -> Decimal:
+    return x.quantize(TWOPLACES, rounding=ROUND_HALF_UP)
+
+
+def _normalize_currency(v: str) -> str:
+    cur = (v or "").strip().upper()
+    if len(cur) != 3:
+        raise HTTPException(status_code=400, detail="currency must be a 3-letter code")
+    return cur
+
+
+def _get_rate_to_pln(cur: str) -> Decimal:
+    if cur not in FX_TO_PLN:
+        raise HTTPException(status_code=400, detail=f"Unsupported currency: {cur}")
+    rate = FX_TO_PLN[cur]
+    if rate <= 0:
+        raise HTTPException(status_code=500, detail=f"Invalid FX_TO_PLN rate for {cur}")
+    return rate
+
+
+def _fx_rate(from_cur: str, to_cur: str) -> Decimal:
+    if from_cur == to_cur:
+        return Decimal("1")
+
+    from_to_pln = _get_rate_to_pln(from_cur)
+    to_to_pln = _get_rate_to_pln(to_cur)
+
+    return from_to_pln / to_to_pln
+
+
 @router.post("/", response_model=TransactionRead, status_code=201)
 def create_transaction(
     wallet_id: UUID,
@@ -33,12 +73,13 @@ def create_transaction(
     if wallet is None:
         raise HTTPException(status_code=404, detail="wallet not found")
 
-    currency_base = body.currency_base.upper()
-    if currency_base != wallet.currency:
-        raise HTTPException(
-            status_code=400,
-            detail="currency_base must equal wallet currency",
-        )
+    wallet_currency = _normalize_currency(wallet.currency)
+    input_currency = _normalize_currency(body.currency)
+
+    if body.amount is None:
+        raise HTTPException(status_code=400, detail="amount is required")
+    if body.amount <= 0:
+        raise HTTPException(status_code=400, detail="amount must be greater than 0")
 
     category = (
         db.query(Category)
@@ -52,56 +93,52 @@ def create_transaction(
     if category is None:
         raise HTTPException(status_code=404, detail="category not found")
 
-    product_id = body.product_id
-    if product_id is not None:
-        product = (
-            db.query(Product)
-            .filter(
-                Product.id == product_id,
-                Product.wallet_id == wallet_id,
-                Product.deleted_at.is_(None),
-            )
-            .first()
+    product = (
+        db.query(Product)
+        .filter(
+            Product.id == body.product_id,
+            Product.wallet_id == wallet_id,
+            Product.deleted_at.is_(None),
         )
-        if product is None:
-            raise HTTPException(status_code=404, detail="product not found")
-
-        if product.category_id != body.category_id:
-            raise HTTPException(
-                status_code=400,
-                detail="product does not belong to this category",
-            )
-
-    amount_original = body.amount_original
-    currency_original = body.currency_original
-    fx_rate = body.fx_rate
-
-    fx_fields_set = sum(
-        1 for v in (amount_original, currency_original, fx_rate) if v is not None
+        .first()
     )
+    if product is None:
+        raise HTTPException(status_code=404, detail="product not found")
 
-    if fx_fields_set not in (0, 3):
+    if product.category_id != body.category_id:
         raise HTTPException(
-            status_code=400,
-            detail="Incomplete FX data: amount_original, currency_original and fx_rate must be all set or all null",
+            status_code=400, detail="product does not belong to this category"
         )
 
-    if currency_original is not None:
-        currency_original = currency_original.upper()
+    now_utc = datetime.now(timezone.utc)
+
+    if input_currency == wallet_currency:
+        amount_base = _q2(Decimal(body.amount))
+        amount_original = None
+        currency_original = None
+        fx_rate = None
+    else:
+        rate = _fx_rate(input_currency, wallet_currency)
+
+        amount_original = _q2(Decimal(body.amount))
+        currency_original = input_currency
+        fx_rate = _q2(rate)
+
+        amount_base = _q2(amount_original * fx_rate)
 
     transaction = Transaction(
         wallet_id=wallet_id,
         user_id=current_user.id,
         category_id=body.category_id,
-        product_id=product_id,
+        product_id=body.product_id,
         type="expense",
-        amount_base=body.amount_base,
-        currency_base=currency_base,
+        amount_base=amount_base,
+        currency_base=wallet_currency,
         amount_original=amount_original,
         currency_original=currency_original,
         fx_rate=fx_rate,
         refund_of_transaction_id=None,
-        occurred_at=body.occurred_at,
+        occurred_at=now_utc,
     )
 
     db.add(transaction)
