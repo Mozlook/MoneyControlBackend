@@ -274,3 +274,31 @@ def deactivate_recurring_transaction(
 
     db.commit()
     return
+
+
+@router.put("/{recurring_id}/activate", status_code=204)
+def activate_recurring_transaction(
+    wallet_id: UUID,
+    recurring_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    _ = ensure_wallet_member(db, wallet_id, current_user)
+
+    recurring = (
+        db.query(RecurringTransaction)
+        .filter(
+            RecurringTransaction.id == recurring_id,
+            RecurringTransaction.wallet_id == wallet_id,
+        )
+        .first()
+    )
+
+    if recurring is None:
+        raise HTTPException(status_code=404, detail="recurring not found")
+
+    recurring.active = True
+    recurring.updated_at = datetime.now(timezone.utc)
+
+    db.commit()
+    return
