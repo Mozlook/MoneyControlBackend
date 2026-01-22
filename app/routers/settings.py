@@ -13,7 +13,7 @@ router = APIRouter(
 )
 
 
-@router.get("/users/me/settings", response_model=UserSettingsRead, status_code=200)
+@router.get("/", response_model=UserSettingsRead, status_code=200)
 def get_my_settings(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
@@ -25,7 +25,7 @@ def get_my_settings(
     return UserSettingsRead.model_validate(user_settings)
 
 
-@router.put("/users/me/settings", response_model=UserSettingsRead, status_code=200)
+@router.put("/", response_model=UserSettingsRead, status_code=200)
 def update_my_settings(
     body: UserSettingsUpdate,
     db: Annotated[Session, Depends(get_db)],
