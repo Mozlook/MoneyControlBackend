@@ -47,13 +47,15 @@ def summary_categories_products(
 
     settings = current_user.user_settings
 
-    period_start_utc, period_end_utc = resolve_period_range_utc(
+    period = resolve_period_range_utc(
         billing_day=settings.billing_day,
         timezone_name=settings.timezone,
         current_period=current_period,
         from_date=from_date,
         to_date=to_date,
     )
+    period_start_utc = period.period_start_utc
+    period_end_utc = period.period_end_utc
 
     base_q = db.query(Transaction).filter(
         Transaction.wallet_id == wallet_id,
