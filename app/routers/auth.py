@@ -62,7 +62,7 @@ def auth_google(
             id=user.id,
             language="pl",
             currency="PLN",
-            billing_day=1,
+            billing_day=10,
             timezone="Europe/Warsaw",
         )
         db.add(settings)
