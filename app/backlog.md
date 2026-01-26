@@ -433,17 +433,17 @@ Aplikacja finansowa do śledzenia wydatków:
   - date range
   - category/product
   - przełącznik “current period” vs zakres ręczny
-- [ ] **FE-06.3** – Dodanie transakcji (formularz)
+- [x] **FE-06.3** – Dodanie transakcji (formularz)
   - amount_base + occurred_at + category/product
   - tryb FX (opcjonalny): amount_original + currency_original + fx_rate
-- [ ] **FE-06.4** – Refund
+- [x] **FE-06.4** – Refund
   - `transactionsApi.refund(walletId, transactionId)`
-- [ ] **FE-06.5** – Soft delete
+- [x] **FE-06.5** – Soft delete
   - `transactionsApi.delete(walletId, transactionId)`
-- [ ] **FE-06.6** – Export CSV
+- [x] **FE-06.6** – Export CSV
   - `transactionsApi.exportCsv(walletId, filters)` (download Blob)
   - poprawna nazwa pliku
-- [ ] **FE-06.7** – UX
+- [x] **FE-06.7** – UX
   - loading states, empty states, toasty
   - invalidacje query po mutacjach
 
@@ -455,18 +455,18 @@ Aplikacja finansowa do śledzenia wydatków:
 
 **Cel sprintu:** pełna obsługa recurring i generowanie transakcji na okres.
 
-- [ ] **FE-07.1** – Lista recurring
+- [x] **FE-07.1** – Lista recurring
   - `recurringApi.getAll(walletId, { active? })`
-- [ ] **FE-07.2** – Dodanie recurring
+- [x] **FE-07.2** – Dodanie recurring
   - `recurringApi.create(walletId, ...)`
-- [ ] **FE-07.3** – Edycja recurring
+- [x] **FE-07.3** – Edycja recurring
   - `recurringApi.update(walletId, recurringId, ...)`
-- [ ] **FE-07.4** – Deaktywacja
+- [x] **FE-07.4** – Deaktywacja
   - `recurringApi.delete(walletId, recurringId)` (active=false)
-- [ ] **FE-07.5** – Apply recurring
+- [x] **FE-07.5** – Apply recurring
   - `recurringApi.apply(walletId)`
   - UX: confirm modal + komunikat sukcesu
-- [ ] **FE-07.6** – Spójność danych
+- [x] **FE-07.6** – Spójność danych
   - invalidacje: transactions + summary + history
 
 **DoD (FE-07):** recurring działa end-to-end, a apply wpływa na listy i dashboard.
@@ -479,30 +479,30 @@ Aplikacja finansowa do śledzenia wydatków:
 
 #### Dashboard
 
-- [ ] **FE-08.1** – By-importance
+- [x] **FE-08.1** – By-importance
   - `summaryApi.byImportance(walletId, range)`
-- [ ] **FE-08.2** – Categories-products
+- [x] **FE-08.2** – Categories-products
   - `summaryApi.categoriesProducts(walletId, range)`
   - widok drzewka: kategorie → produkty, sumy + no-product
-- [ ] **FE-08.3** – Historia N okresów
+- [x] **FE-08.3** – Historia N okresów
   - `historyApi.lastPeriods(walletId, periods)`
   - MVP: tabela (opcjonalnie wykres jako upgrade)
 
 #### Ustawienia usera
 
-- [ ] **FE-08.4** – `/app/settings` – settings read + update
+- [x] **FE-08.4** – `/app/settings` – settings read + update
   - `usersApi.getSettings()`
   - `usersApi.updateSettings()`
-- [ ] **FE-08.5** – Reakcja na zmianę settings
+- [x] **FE-08.5** – Reakcja na zmianę settings
   - odświeżenie danych zależnych od billing day/timezone
 
 #### Polish
 
-- [ ] **FE-08.6** – Spójne komunikaty błędów (ApiError → UI)
-- [ ] **FE-08.7** – Skeletony i empty states na wszystkich ekranach
-- [ ] **FE-08.8** – Role-based UI (owner/editor) wszędzie gdzie potrzeba
-- [ ] **FE-08.9** – Responsywność
-- [ ] **FE-08.10** – README (runbook)
+- [x] **FE-08.6** – Spójne komunikaty błędów (ApiError → UI)
+- [x] **FE-08.7** – Skeletony i empty states na wszystkich ekranach
+- [x] **FE-08.8** – Role-based UI (owner/editor) wszędzie gdzie potrzeba
+- [x] **FE-08.9** – Responsywność
+- [x] **FE-08.10** – README (runbook)
   - uruchomienie dev
   - konfiguracja env
   - opis architektury API (`apiPaths`, `ApiClient`, moduły)
