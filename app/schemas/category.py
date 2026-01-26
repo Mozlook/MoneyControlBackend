@@ -1,20 +1,23 @@
-from decimal import Decimal
-from pydantic import BaseModel, ConfigDict
 from datetime import datetime
+from decimal import Decimal
 from uuid import UUID
 
+from pydantic import ConfigDict
+from sqlmodel import SQLModel
 
-class CategoryCreate(BaseModel):
+
+class CategoryBase(SQLModel):
     name: str
     color: str | None = None
     icon: str | None = None
 
 
-class CategoryRead(BaseModel):
+class CategoryCreate(CategoryBase):
+    pass
+
+
+class CategoryRead(CategoryBase):
     id: UUID
-    name: str
-    color: str | None = None
-    icon: str | None = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

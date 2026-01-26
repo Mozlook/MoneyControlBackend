@@ -16,7 +16,3 @@ SessionLocal = sessionmaker(
     bind=engine,
     future=True,
 )
-
-
-class Base(DeclarativeBase):
-    pass

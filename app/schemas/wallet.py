@@ -1,17 +1,20 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import ConfigDict
+from sqlmodel import SQLModel
 
 
-class WalletCreate(BaseModel):
+class WalletBase(SQLModel):
     name: str
+
+
+class WalletCreate(WalletBase):
     currency: str | None = None
 
 
-class WalletRead(BaseModel):
+class WalletRead(WalletBase):
     id: UUID
-    name: str
     currency: str
     created_at: datetime
     role: str
@@ -19,12 +22,12 @@ class WalletRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class WalletMemberAdd(BaseModel):
+class WalletMemberAdd(SQLModel):
     user_id: UUID | None = None
     email: str | None = None
 
 
-class MemberRead(BaseModel):
+class MemberRead(SQLModel):
     user_id: UUID
     email: str
     display_name: str | None

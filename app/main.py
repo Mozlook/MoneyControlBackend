@@ -1,7 +1,9 @@
+from contextlib import asynccontextmanager
+
 from typing import Annotated
 from fastapi import Depends, FastAPI
 from sqlalchemy import text
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, configure_mappers
 
 from .deps import get_db
 from .routers import (
@@ -17,7 +19,16 @@ from .routers import (
     history,
 )
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    from app import models
+
+    configure_mappers()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 DbSession = Annotated[Session, Depends(get_db)]
 

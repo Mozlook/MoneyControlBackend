@@ -31,8 +31,10 @@ python-jose==3.5.0
 PyYAML==6.0.3
 requests==2.32.5
 rsa==4.9.1
+setuptools==80.9.0
 six==1.17.0
 SQLAlchemy==2.0.45
+sqlmodel==0.0.31
 starlette==0.50.0
 typing-inspection==0.4.2
 typing_extensions==4.15.0
@@ -41,3 +43,4 @@ uvicorn==0.38.0
 uvloop==0.22.1
 watchfiles==1.1.1
 websockets==15.0.1
+wheel==0.45.1

@@ -1,25 +1,34 @@
-from decimal import Decimal
-from pydantic import BaseModel, ConfigDict
-from uuid import UUID
 from datetime import datetime
-from ..schemas.category import CategoryRead
-from ..models import ProductImportance
+from decimal import Decimal
+from uuid import UUID
+
+from pydantic import ConfigDict
+from sqlmodel import SQLModel, Field
+from sqlalchemy import Enum as SAEnum
+
+from ..domain.enums import ProductImportance
+from .category import CategoryRead
 
 
-class ProductCreate(BaseModel):
+class ProductBase(SQLModel):
     name: str
+    importance: ProductImportance = Field(
+        sa_type=SAEnum(ProductImportance, name="product_importance_enum")
+    )
+
+
+class ProductCreate(ProductBase):
     category_id: UUID
-    importance: ProductImportance
 
 
-class ProductRead(BaseModel):
+class ProductPublic(ProductBase):
     id: UUID
-    name: str
-    importance: ProductImportance
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ProductRead(ProductPublic):
     created_at: datetime
     category: CategoryRead
-
-    model_config = ConfigDict(from_attributes=True)
 
 
 class ProductReadSum(ProductRead):

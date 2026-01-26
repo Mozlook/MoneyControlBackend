@@ -1,13 +1,17 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, ConfigDict
+from pydantic import ConfigDict, EmailStr
+from sqlmodel import SQLModel
 
 
-class UserRead(BaseModel):
-    id: uuid.UUID
+class UserBase(SQLModel):
     email: EmailStr
-    display_name: str | None
+    display_name: str | None = None
+
+
+class UserRead(UserBase):
+    id: uuid.UUID
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
