@@ -20,11 +20,6 @@ def resolve_period_range_utc(
     to_date: date | None = None,
     now_utc: datetime | None = None,
 ) -> PeriodRangeUTC:
-    """
-    Zwraca [period_start_utc, period_end_utc) (end EXCLUSIVE).
-    - current_period=True: okres wg billing_day i timezone usera
-    - current_period=False: zakres ręczny (from_date/to_date) w timezone usera
-    """
     local_tz = ZoneInfo(timezone_name)
     now_utc = now_utc or datetime.now(timezone.utc)
 
@@ -73,3 +68,27 @@ def resolve_period_range_utc(
     return PeriodRangeUTC(
         period_start_utc=period_start_utc, period_end_utc=period_end_utc
     )
+
+
+def last_n_period_ranges_utc(
+    *,
+    billing_day: int,
+    timezone_name: str,
+    periods: int,
+    now_utc: datetime | None = None,
+) -> list[PeriodRangeUTC]:
+    cursor = now_utc or datetime.now(timezone.utc)
+    out: list[PeriodRangeUTC] = []
+
+    for _ in range(periods):
+        pr = resolve_period_range_utc(
+            billing_day=billing_day,
+            timezone_name=timezone_name,
+            current_period=True,
+            now_utc=cursor,
+        )
+        out.append(pr)
+
+        cursor = pr.period_start_utc - timedelta(microseconds=1)
+
+    return out
