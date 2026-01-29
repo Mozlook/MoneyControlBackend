@@ -1,9 +1,9 @@
 from datetime import datetime, timezone
-from typing import Optional
 from uuid import UUID
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
+from sqlmodel import col
 
 from ..models import Product
 
@@ -13,10 +13,10 @@ def get_product(
     *,
     wallet_id: UUID,
     product_id: UUID,
-) -> Optional[Product]:
+) -> Product | None:
     return (
         db.query(Product)
-        .filter(Product.wallet_id == wallet_id, Product.id == product_id)
+        .filter(col(Product.wallet_id) == wallet_id, col(Product.id) == product_id)
         .first()
     )
 

@@ -1,5 +1,6 @@
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
+from sqlmodel import col
 
 from ..schemas.auth import GoogleAuthRequest, TokenResponse
 from ..auth.google import verify_google_id_token, InvalidGoogleTokenError
@@ -34,8 +35,8 @@ def auth_google(
     oauth = (
         db.query(UserOauth)
         .filter(
-            UserOauth.provider == "google",
-            UserOauth.provider_sub == google_sub,
+            col(UserOauth.provider) == "google",
+            col(UserOauth.provider_sub) == google_sub,
         )
         .first()
     )
@@ -43,7 +44,7 @@ def auth_google(
     if oauth:
         user = oauth.user
     else:
-        user = User(email=email, display_name=display_name)
+        user = User(email=email, display_name=str(display_name))
         db.add(user)
         db.flush()
 

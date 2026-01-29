@@ -2,6 +2,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
+from sqlmodel import col
 
 from ..helpers.wallets import ensure_wallet_member
 from ..helpers.periods import last_n_period_ranges_utc
@@ -41,11 +42,11 @@ def history_last_periods(
         total = (
             db.query(func.coalesce(func.sum(Transaction.amount_base), 0))
             .filter(
-                Transaction.wallet_id == wallet_id,
-                Transaction.deleted_at.is_(None),
-                Transaction.type == "expense",
-                Transaction.occurred_at >= pr.period_start_utc,
-                Transaction.occurred_at < pr.period_end_utc,
+                col(Transaction.wallet_id) == wallet_id,
+                col(Transaction.deleted_at).is_(None),
+                col(Transaction.type) == "expense",
+                col(Transaction.occurred_at) >= pr.period_start_utc,
+                col(Transaction.occurred_at) < pr.period_end_utc,
             )
             .scalar()
         )

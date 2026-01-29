@@ -3,14 +3,15 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
+from sqlmodel import col
 
 from ..models import Category
 
 
-def get_category(db: Session, *, wallet_id, category_id: UUID) -> Category | None:
+def get_category(db: Session, *, wallet_id: UUID, category_id: UUID) -> Category | None:
     return (
         db.query(Category)
-        .filter(Category.wallet_id == wallet_id, Category.id == category_id)
+        .filter(col(Category.wallet_id) == wallet_id, col(Category.id) == category_id)
         .first()
     )
 
@@ -48,8 +49,8 @@ def soft_delete_now(cat: Category) -> None:
 
 def ensure_category_name_unique(db: Session, *, wallet_id: UUID, name: str) -> None:
     exists = (
-        db.query(Category.id)
-        .filter(Category.wallet_id == wallet_id, Category.name == name)
+        db.query(col(Category.id))
+        .filter(col(Category.wallet_id) == wallet_id, col(Category.name) == name)
         .first()
     )
     if exists is not None:

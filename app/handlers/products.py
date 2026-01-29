@@ -5,6 +5,7 @@ from decimal import Decimal
 from fastapi import HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload, selectinload
+from sqlmodel import col
 
 from ..models import RecurringTransaction, User, Product, Transaction
 from ..schemas.product import ProductCreate, ProductRead, ProductReadSum
@@ -16,6 +17,7 @@ from ..helpers.products import (
     soft_delete_now,
 )
 from ..helpers.product_refs import unlink_product_references
+from ..helpers.users import require_user_settings
 
 
 def create_product(
@@ -46,7 +48,7 @@ def create_product(
     product = (
         db.query(Product)
         .options(selectinload(Product.category))
-        .filter(Product.id == product.id)
+        .filter(col(Product.id) == product.id)
         .one()
     )
     return ProductRead.model_validate(product)
@@ -65,15 +67,15 @@ def list_products(
     query = (
         db.query(Product)
         .filter(
-            Product.wallet_id == wallet_id,
+            col(Product.wallet_id) == wallet_id,
         )
         .options(selectinload(Product.category))
     )
 
     if deleted:
-        query = query.filter(Product.deleted_at.isnot(None))
+        query = query.filter(col(Product.deleted_at).isnot(None))
     else:
-        query = query.filter(Product.deleted_at.is_(None))
+        query = query.filter(col(Product.deleted_at).is_(None))
 
     if category_id is not None:
         _ = get_category_or_404(
@@ -83,8 +85,8 @@ def list_products(
             require_not_deleted=True,
         )
 
-        query = query.filter(Product.category_id == category_id)
-    products = query.order_by(Product.created_at).all()
+        query = query.filter(col(Product.category_id) == category_id)
+    products = query.order_by(col(Product.created_at)).all()
 
     return [ProductRead.model_validate(p) for p in products]
 
@@ -92,7 +94,7 @@ def list_products(
 def soft_delete_product(
     *, wallet_id: UUID, product_id: UUID, db: Session, current_user: User
 ) -> None:
-    ensure_wallet_member(db, wallet_id, current_user)
+    _ = ensure_wallet_member(db, wallet_id, current_user)
 
     product = get_product_or_404(
         db, wallet_id=wallet_id, product_id=product_id, require_not_deleted=True
@@ -107,25 +109,26 @@ def soft_delete_product(
 def hard_delete_product(
     *, wallet_id: UUID, product_id: UUID, db: Session, current_user: User
 ) -> None:
-    ensure_wallet_member(db, wallet_id, current_user)
+    _ = ensure_wallet_member(db, wallet_id, current_user)
 
     product = get_product_or_404(
         db, wallet_id=wallet_id, product_id=product_id, require_not_deleted=False
     )
 
     has_tx = (
-        db.query(Transaction.id)
+        db.query(Transaction)
         .filter(
-            Transaction.wallet_id == wallet_id, Transaction.product_id == product_id
+            col(Transaction.wallet_id) == wallet_id,
+            col(Transaction.product_id) == product_id,
         )
         .first()
         is not None
     )
     has_rtx = (
-        db.query(RecurringTransaction.id)
+        db.query(RecurringTransaction)
         .filter(
-            RecurringTransaction.wallet_id == wallet_id,
-            RecurringTransaction.product_id == product_id,
+            col(RecurringTransaction.wallet_id) == wallet_id,
+            col(RecurringTransaction.product_id) == product_id,
         )
         .first()
         is not None
@@ -161,7 +164,7 @@ def list_products_with_sum(
             require_not_deleted=True,
         )
 
-    settings = current_user.user_settings
+    settings = require_user_settings(current_user)
     pr = resolve_period_range_utc(
         billing_day=settings.billing_day,
         timezone_name=settings.timezone,
@@ -176,13 +179,13 @@ def list_products_with_sum(
             func.sum(Transaction.amount_base).label("period_sum"),
         )
         .filter(
-            Transaction.wallet_id == wallet_id,
-            Transaction.deleted_at.is_(None),
-            Transaction.product_id.isnot(None),
-            Transaction.occurred_at >= pr.period_start_utc,
-            Transaction.occurred_at < pr.period_end_utc,
+            col(Transaction.wallet_id) == wallet_id,
+            col(Transaction.deleted_at).is_(None),
+            col(Transaction.product_id).isnot(None),
+            col(Transaction.occurred_at) >= pr.period_start_utc,
+            col(Transaction.occurred_at) < pr.period_end_utc,
         )
-        .group_by(Transaction.product_id)
+        .group_by(col(Transaction.product_id))
         .subquery()
     )
 
@@ -194,15 +197,15 @@ def list_products_with_sum(
         .outerjoin(tx_sum_sq, tx_sum_sq.c.product_id == Product.id)
         .options(joinedload(Product.category))
         .filter(
-            Product.wallet_id == wallet_id,
-            Product.deleted_at.is_(None),
+            col(Product.wallet_id) == wallet_id,
+            col(Product.deleted_at).is_(None),
         )
     )
 
     if category_id is not None:
-        products_q = products_q.filter(Product.category_id == category_id)
+        products_q = products_q.filter(col(Product.category_id) == category_id)
 
-    rows = products_q.order_by(Product.name.asc()).all()
+    rows = products_q.order_by(col(Product.name).asc()).all()
 
     out: list[ProductReadSum] = []
     for prod, period_sum in rows:

@@ -2,6 +2,7 @@ from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from ..models import WalletUser, User
+from sqlmodel import col
 
 
 def ensure_wallet_member(
@@ -10,7 +11,8 @@ def ensure_wallet_member(
     membership = (
         db.query(WalletUser)
         .filter(
-            WalletUser.wallet_id == wallet_id, WalletUser.user_id == current_user.id
+            col(WalletUser.wallet_id) == wallet_id,
+            col(WalletUser.user_id) == current_user.id,
         )
         .first()
     )

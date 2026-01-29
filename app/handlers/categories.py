@@ -5,6 +5,7 @@ from decimal import Decimal
 from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
+from sqlmodel import col
 
 from ..models import RecurringTransaction, User, Category, Transaction
 from ..schemas.category import CategoryCreate, CategoryRead, CategoryReadSum
@@ -21,7 +22,7 @@ from ..helpers.users import require_user_settings
 def create_category(
     *, wallet_id: UUID, body: CategoryCreate, db: Session, current_user: User
 ) -> CategoryRead:
-    ensure_wallet_member(db, wallet_id, current_user)
+    _ = ensure_wallet_member(db, wallet_id, current_user)
 
     ensure_category_name_unique(db, wallet_id=wallet_id, name=body.name)
 
@@ -37,24 +38,25 @@ def create_category(
 def list_categories(
     *, wallet_id: UUID, db: Session, current_user: User, deleted: bool = False
 ) -> list[CategoryRead]:
-    ensure_wallet_member(db, wallet_id, current_user)
+    _ = ensure_wallet_member(db, wallet_id, current_user)
 
-    q = db.query(Category).filter(Category.wallet_id == wallet_id)
+    q = db.query(Category).filter(col(Category.wallet_id) == wallet_id)
     q = (
-        q.filter(Category.deleted_at.isnot(None))
+        q.filter(col(Category.deleted_at).isnot(None))
         if deleted
-        else q.filter(Category.deleted_at.is_(None))
+        else q.filter(col(Category.deleted_at).is_(None))
     )
 
     return [
-        CategoryRead.model_validate(c) for c in q.order_by(Category.created_at).all()
+        CategoryRead.model_validate(c)
+        for c in q.order_by(col(Category.created_at)).all()
     ]
 
 
 def soft_delete_category(
     *, wallet_id: UUID, category_id: UUID, db: Session, current_user: User
 ) -> None:
-    ensure_wallet_member(db, wallet_id, current_user)
+    _ = ensure_wallet_member(db, wallet_id, current_user)
 
     category = get_category_or_404(
         db, wallet_id=wallet_id, category_id=category_id, require_not_deleted=True
@@ -67,19 +69,21 @@ def soft_delete_category(
 def hard_delete_category(
     *, wallet_id: UUID, category_id: UUID, db: Session, current_user: User
 ) -> None:
-    ensure_wallet_member(db, wallet_id, current_user)
+    _ = ensure_wallet_member(db, wallet_id, current_user)
 
     category = get_category_or_404(
         db, wallet_id=wallet_id, category_id=category_id, require_not_deleted=False
     )
 
     has_tx = (
-        db.query(Transaction.id).filter(Transaction.category_id == category_id).first()
+        db.query(Transaction)
+        .filter(col(Transaction.category_id) == category_id)
+        .first()
         is not None
     )
     has_rtx = (
-        db.query(RecurringTransaction.id)
-        .filter(RecurringTransaction.category_id == category_id)
+        db.query(RecurringTransaction)
+        .filter(col(RecurringTransaction.category_id) == category_id)
         .first()
         is not None
     )
@@ -104,7 +108,7 @@ def list_categories_with_sum(
     to_date: date | None = None,
     include_empty: bool = True,
 ) -> list[CategoryReadSum]:
-    ensure_wallet_member(db, wallet_id, current_user)
+    _ = ensure_wallet_member(db, wallet_id, current_user)
 
     settings = require_user_settings(current_user)
     pr = resolve_period_range_utc(
@@ -121,12 +125,12 @@ def list_categories_with_sum(
             func.sum(Transaction.amount_base).label("period_sum"),
         )
         .filter(
-            Transaction.wallet_id == wallet_id,
-            Transaction.deleted_at.is_(None),
-            Transaction.occurred_at >= pr.period_start_utc,
-            Transaction.occurred_at < pr.period_end_utc,
+            col(Transaction.wallet_id) == wallet_id,
+            col(Transaction.deleted_at).is_(None),
+            col(Transaction.occurred_at) >= pr.period_start_utc,
+            col(Transaction.occurred_at) < pr.period_end_utc,
         )
-        .group_by(Transaction.category_id)
+        .group_by(col(Transaction.category_id))
         .subquery()
     )
 
@@ -137,8 +141,10 @@ def list_categories_with_sum(
     q = (
         db.query(Category, period_sum_col)
         .outerjoin(tx_sum_sq, tx_sum_sq.c.category_id == Category.id)
-        .filter(Category.wallet_id == wallet_id, Category.deleted_at.is_(None))
-        .order_by(Category.name.asc())
+        .filter(
+            col(Category.wallet_id) == wallet_id, col(Category.deleted_at).is_(None)
+        )
+        .order_by(col(Category.name).asc())
     )
 
     if not include_empty:

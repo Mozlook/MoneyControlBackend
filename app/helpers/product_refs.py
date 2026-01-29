@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from uuid import UUID
 from ..models import Transaction, RecurringTransaction
+from sqlmodel import col
 
 
 def unlink_product_references(
@@ -9,19 +10,21 @@ def unlink_product_references(
     wallet_id: UUID,
     product_id: UUID,
 ) -> None:
-    (
+
+    _ = (
         db.query(Transaction)
         .filter(
-            Transaction.wallet_id == wallet_id, Transaction.product_id == product_id
+            col(Transaction.wallet_id) == wallet_id,
+            col(Transaction.product_id) == product_id,
         )
-        .update({Transaction.product_id: None}, synchronize_session=False)
+        .update({col(Transaction.product_id): None}, synchronize_session=False)
     )
 
-    (
+    _ = (
         db.query(RecurringTransaction)
         .filter(
-            RecurringTransaction.wallet_id == wallet_id,
-            RecurringTransaction.product_id == product_id,
+            col(RecurringTransaction.wallet_id) == wallet_id,
+            col(RecurringTransaction.product_id) == product_id,
         )
-        .update({RecurringTransaction.product_id: None}, synchronize_session=False)
+        .update({col(RecurringTransaction.product_id): None}, synchronize_session=False)
     )
