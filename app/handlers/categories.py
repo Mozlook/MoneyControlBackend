@@ -121,7 +121,7 @@ def list_categories_with_sum(
 
     tx_sum_sq = (
         db.query(
-            Transaction.category_id.label("category_id"),
+            col(Transaction.category_id).label("category_id"),
             func.sum(Transaction.amount_base).label("period_sum"),
         )
         .filter(
