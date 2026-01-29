@@ -284,7 +284,7 @@ def activate_recurring_transaction(
     db: Session,
     current_user: User,
 ) -> None:
-    ensure_wallet_member(db, wallet_id, current_user)
+    _ = ensure_wallet_member(db, wallet_id, current_user)
 
     recurring = get_recurring_or_404(
         db,
