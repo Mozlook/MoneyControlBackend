@@ -1,0 +1,29 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: moneycontrol
+      POSTGRES_USER: moneycontrol
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  backend:
+    build: .
+    environment:
+      DATABASE_URL: postgresql+psycopg2://moneycontrol:${POSTGRES_PASSWORD}@db:5432/moneycontrol
+
+      JWT_SECRET: ${JWT_SECRET}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+
+      ROOT_PATH: /moneycontrol
+    depends_on:
+      - db
+    ports:
+      - "127.0.0.1:8010:8000"
+    restart: unless-stopped
+
+volumes:
+  pgdata:
