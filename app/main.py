@@ -1,7 +1,11 @@
-from contextlib import asynccontextmanager
+from __future__ import annotations
 
+import os
+from contextlib import asynccontextmanager
 from typing import Annotated
+
 from fastapi import Depends, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.orm import Session, configure_mappers
 
@@ -19,6 +23,11 @@ from .routers import (
     history,
 )
 
+ROOT_PATH = os.getenv("ROOT_PATH", "").rstrip("/")
+
+CORS_ORIGINS_RAW = os.getenv("CORS_ORIGINS", "")
+CORS_ORIGINS = [o.strip() for o in CORS_ORIGINS_RAW.split(",") if o.strip()]
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -28,7 +37,20 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(
+    lifespan=lifespan,
+    root_path=ROOT_PATH,
+)
+
+if CORS_ORIGINS:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=CORS_ORIGINS,
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
 
 DbSession = Annotated[Session, Depends(get_db)]
 
@@ -44,12 +66,12 @@ app.include_router(summary.router)
 app.include_router(history.router)
 
 
-@app.get("/health")
+@app.get("/health", include_in_schema=False)
 def health_check():
     return {"status": "ok"}
 
 
-@app.get("/db-check")
+@app.get("/db-check", include_in_schema=False)
 def db_check(db: DbSession):
     _ = db.execute(text("SELECT 1"))
     return {"db": "ok"}
