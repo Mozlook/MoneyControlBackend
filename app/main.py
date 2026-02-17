@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import time
+from .logging_setup import setup_logger, request_id_ctx, new_request_id
 import os
 from contextlib import asynccontextmanager
 from typing import Annotated
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.orm import Session, configure_mappers
@@ -41,6 +43,60 @@ app = FastAPI(
     lifespan=lifespan,
     root_path=ROOT_PATH,
 )
+
+logger = setup_logger()
+
+
+@app.middleware("http")
+async def request_logging_middleware(request: Request, call_next):
+    rid = request.headers.get("x-request-id") or new_request_id()
+    token = request_id_ctx.set(rid)
+
+    start = time.perf_counter()
+    response = None
+    status_code = 500
+
+    try:
+        response = await call_next(request)
+        status_code = response.status_code
+        return response
+
+    except Exception as exc:
+        logger.error(
+            "unhandled exception",
+            extra={
+                "event_type": "unhandled_exception",
+                "error_type": type(exc).__name__,
+                "src_ip": request.client.host if request.client else None,
+                "method": request.method,
+                "path": f"{request.scope.get('root_path','')}{request.url.path}",
+                "user_agent": (request.headers.get("user-agent") or "")[:256],
+            },
+            exc_info=True,
+        )
+        raise
+
+    finally:
+        latency_ms = round((time.perf_counter() - start) * 1000, 2)
+
+        logger.info(
+            "request",
+            extra={
+                "event_type": "http_request",
+                "src_ip": request.client.host if request.client else None,
+                "method": request.method,
+                "path": f"{request.scope.get('root_path','')}{request.url.path}",
+                "status": status_code,
+                "latency_ms": latency_ms,
+                "user_agent": (request.headers.get("user-agent") or "")[:256],
+            },
+        )
+
+        if response is not None:
+            response.headers["X-Request-ID"] = rid
+
+        request_id_ctx.reset(token)
+
 
 if CORS_ORIGINS:
     app.add_middleware(

@@ -18,7 +18,13 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       CORS_ORIGINS: ${CORS_ORIGINS}
 
+      APP_NAME: MoneyControl
+      LOG_PATH: /logs/moneycontrol.jsonl
+      LOG_LEVEL: INFO
+
       ROOT_PATH: /moneycontrol
+    volumes:
+      - /srv/moneycontrol_logs:/logs
     depends_on:
       - db
     ports:
@@ -27,3 +33,4 @@ services:
 
 volumes:
   pgdata:
+  moneycontrol_logs:

@@ -528,9 +528,9 @@ Aplikacja finansowa do śledzenia wydatków:
 
 ## E12 – Deploy (późniejszy etap)
 
-- [ ] **D1** – Dockerfile backendu
-- [ ] **D2** – docker-compose dla prod (backend + db + reverse proxy)
-- [ ] **D3** – Reverse proxy (nginx/traefik) + HTTPS
-- [ ] **D4** – Deploy backendu na VPS / chmurę
-- [ ] **D5** – Frontend na Netlify / innym hostingu statycznym
+- [x] **D1** – Dockerfile backendu
+- [x] **D2** – docker-compose dla prod (backend + db + reverse proxy)
+- [x] **D3** – Reverse proxy (nginx/traefik) + HTTPS
+- [x] **D4** – Deploy backendu na VPS / chmurę
+- [x] **D5** – Frontend na Netlify / innym hostingu statycznym
 - [ ] **D6** – Strategia migracji DB w deployu (alembic upgrade)
