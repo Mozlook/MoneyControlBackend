@@ -6,7 +6,7 @@ import os
 from contextlib import asynccontextmanager
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.orm import Session, configure_mappers
@@ -62,18 +62,19 @@ async def request_logging_middleware(request: Request, call_next):
         return response
 
     except Exception as exc:
-        logger.error(
-            "unhandled exception",
-            extra={
-                "event_type": "unhandled_exception",
-                "error_type": type(exc).__name__,
-                "src_ip": request.client.host if request.client else None,
-                "method": request.method,
-                "path": f"{request.scope.get('root_path','')}{request.url.path}",
-                "user_agent": (request.headers.get("user-agent") or "")[:256],
-            },
-            exc_info=True,
-        )
+        if not isinstance(exc, HTTPException):
+            logger.error(
+                "unhandled exception",
+                extra={
+                    "event_type": "unhandled_exception",
+                    "error_type": type(exc).__name__,
+                    "src_ip": request.client.host if request.client else None,
+                    "method": request.method,
+                    "path": f"{request.scope.get('root_path','')}{request.url.path}",
+                    "user_agent": (request.headers.get("user-agent") or "")[:256],
+                },
+                exc_info=True,
+            )
         raise
 
     finally:

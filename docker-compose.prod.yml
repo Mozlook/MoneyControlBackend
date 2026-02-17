@@ -24,7 +24,7 @@ services:
 
       ROOT_PATH: /moneycontrol
     volumes:
-      - /srv/moneycontrol_logs:/logs
+      - /srv/app_logs/MoneyControl:/logs
     depends_on:
       - db
     ports:
