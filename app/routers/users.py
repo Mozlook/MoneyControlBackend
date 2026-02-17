@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends
 from typing import Annotated
 
 from ..schemas.user import UserRead
@@ -9,6 +9,5 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 
 @router.get("/me", response_model=UserRead)
-def read_me(current_user: Annotated[User, Depends(get_current_user)], request: Request):
-    request.state.user_id = str(current_user.id)
+def read_me(current_user: Annotated[User, Depends(get_current_user)]):
     return current_user

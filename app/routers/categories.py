@@ -2,18 +2,21 @@ from typing import Annotated
 from uuid import UUID
 from datetime import date
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request, HTTPException
 from sqlalchemy.orm import Session
 
 from ..deps import get_db, get_current_user
 from ..models import User
 from ..schemas.category import CategoryCreate, CategoryRead, CategoryReadSum
 from ..handlers import categories as categories_handler
+from ..logging_setup import setup_logger
 
 router = APIRouter(
     prefix="/wallets/{wallet_id}/categories",
     tags=["categories"],
 )
+
+logger = setup_logger()
 
 DB = Annotated[Session, Depends(get_db)]
 CurrentUser = Annotated[User, Depends(get_current_user)]
@@ -25,10 +28,45 @@ def create_category(
     body: CategoryCreate,
     db: DB,
     current_user: CurrentUser,
+    request: Request,
 ):
-    return categories_handler.create_category(
-        db=db, wallet_id=wallet_id, body=body, current_user=current_user
+    try:
+        category = categories_handler.create_category(
+            db=db, wallet_id=wallet_id, body=body, current_user=current_user
+        )
+
+    except HTTPException as exc:
+        if exc.status_code == 403:
+            logger.warning(
+                "permission denied",
+                extra={
+                    "event_type": "permission_denied",
+                    "user_id": str(current_user.id),
+                    "src_ip": request.client.host if request.client else None,
+                    "user_agent": (request.headers.get("user-agent") or "")[:256],
+                    "status": exc.status_code,
+                    "data": {
+                        "wallet_id": str(wallet_id),
+                        "action": "category_create",
+                    },
+                },
+            )
+        raise
+
+    logger.info(
+        "category created",
+        extra={
+            "event_type": "audit_category_created",
+            "user_id": str(current_user.id),
+            "src_ip": request.client.host if request.client else None,
+            "user_agent": (request.headers.get("user-agent") or "")[:256],
+            "data": {
+                "wallet_id": str(wallet_id),
+                "category_id": str(category.id),
+            },
+        },
     )
+    return category
 
 
 @router.get("", response_model=list[CategoryRead])
@@ -49,10 +87,49 @@ def soft_delete_category(
     category_id: UUID,
     db: DB,
     current_user: CurrentUser,
+    request: Request,
 ):
-    return categories_handler.soft_delete_category(
-        wallet_id=wallet_id, category_id=category_id, db=db, current_user=current_user
+    try:
+        categories_handler.soft_delete_category(
+            wallet_id=wallet_id,
+            category_id=category_id,
+            db=db,
+            current_user=current_user,
+        )
+
+    except HTTPException as exc:
+        if exc.status_code == 403:
+            logger.warning(
+                "permission denied",
+                extra={
+                    "event_type": "permission_denied",
+                    "user_id": str(current_user.id),
+                    "src_ip": request.client.host if request.client else None,
+                    "user_agent": (request.headers.get("user-agent") or "")[:256],
+                    "status": exc.status_code,
+                    "data": {
+                        "wallet_id": str(wallet_id),
+                        "category_id": str(category_id),
+                        "action": "category_delete_soft",
+                    },
+                },
+            )
+        raise
+
+    logger.info(
+        "category soft deleted",
+        extra={
+            "event_type": "audit_category_deleted_soft",
+            "user_id": str(current_user.id),
+            "src_ip": request.client.host if request.client else None,
+            "user_agent": (request.headers.get("user-agent") or "")[:256],
+            "data": {
+                "wallet_id": str(wallet_id),
+                "category_id": str(category_id),
+            },
+        },
     )
+    return None
 
 
 @router.delete("/{category_id}/hard", status_code=204)
@@ -61,10 +138,49 @@ def hard_delete_category(
     category_id: UUID,
     db: DB,
     current_user: CurrentUser,
+    request: Request,
 ):
-    return categories_handler.hard_delete_category(
-        wallet_id=wallet_id, category_id=category_id, db=db, current_user=current_user
+    try:
+        categories_handler.hard_delete_category(
+            wallet_id=wallet_id,
+            category_id=category_id,
+            db=db,
+            current_user=current_user,
+        )
+
+    except HTTPException as exc:
+        if exc.status_code == 403:
+            logger.warning(
+                "permission denied",
+                extra={
+                    "event_type": "permission_denied",
+                    "user_id": str(current_user.id),
+                    "src_ip": request.client.host if request.client else None,
+                    "user_agent": (request.headers.get("user-agent") or "")[:256],
+                    "status": exc.status_code,
+                    "data": {
+                        "wallet_id": str(wallet_id),
+                        "category_id": str(category_id),
+                        "action": "category_delete_hard",
+                    },
+                },
+            )
+        raise
+
+    logger.warning(
+        "category hard deleted",
+        extra={
+            "event_type": "audit_category_deleted_hard",
+            "user_id": str(current_user.id),
+            "src_ip": request.client.host if request.client else None,
+            "user_agent": (request.headers.get("user-agent") or "")[:256],
+            "data": {
+                "wallet_id": str(wallet_id),
+                "category_id": str(category_id),
+            },
+        },
     )
+    return None
 
 
 @router.get("/with-sum", response_model=list[CategoryReadSum])
