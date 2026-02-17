@@ -79,11 +79,13 @@ async def request_logging_middleware(request: Request, call_next):
 
     finally:
         latency_ms = round((time.perf_counter() - start) * 1000, 2)
+        user_id = getattr(request.state, "user_id", None)
 
         logger.info(
             "request",
             extra={
                 "event_type": "http_request",
+                "user_id": user_id,
                 "src_ip": request.client.host if request.client else None,
                 "method": request.method,
                 "path": f"{request.scope.get('root_path','')}{request.url.path}",
