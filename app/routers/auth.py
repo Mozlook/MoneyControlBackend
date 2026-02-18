@@ -11,14 +11,14 @@ from ..schemas.auth import GoogleAuthRequest, TokenResponse
 from ..logging_setup import setup_logger
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-logger = setup_logger()  # <- dodaj
+logger = setup_logger()
 
 
 @router.post("/google", response_model=TokenResponse)
 def auth_google(
     body: GoogleAuthRequest,
     db: Annotated[Session, Depends(get_db)],
-    request: Request,  # <- dodaj
+    request: Request,
 ):
     try:
         token = auth.auth_google(body=body, db=db)
@@ -37,7 +37,6 @@ def auth_google(
         return token
 
     except HTTPException as exc:
-        # typowy przypadek: invalid/expired token -> 401/403/400
         logger.warning(
             "google oauth login failed",
             extra={
@@ -47,7 +46,6 @@ def auth_google(
                 "status": exc.status_code,
                 "data": {
                     "provider": "google",
-                    # detail bywa stringiem albo dict/listą — ucinamy żeby nie wpuścić ton danych
                     "detail": str(exc.detail)[:200],
                 },
             },
@@ -55,7 +53,6 @@ def auth_google(
         raise
 
     except Exception as exc:
-        # “prawdziwy błąd” aplikacji
         logger.error(
             "google oauth login error",
             extra={
